@@ -4,7 +4,7 @@ import MapComponent from './MapComponent'; // Импортируем компо�
 import MapSidebar from './MapSidebar';     // Импортируем компонент боковой панели
 import ToastNotification from './ToastNotification'; // Импортируем новый компонент тоста
 import ConfirmDialog from './ConfirmDialog'; // Новый компонент диалога подтверждения
-import PolygonAnalysisLayer from './PolygonAnalysisLayer'; // НОВЫЙ ИМПОРТ: Компонент для аналитических слоев
+import PolygonAnalysisLayer from './PolygonAnalysisLayer'; // Импортируем компонент для аналитических слоев
 import * as L from 'leaflet';              // Импортируем библиотеку Leaflet для работы с геометрией
 import './Map.css';                        // CSS-файл для специфичных стилей карты (если нужен)
 
@@ -29,6 +29,36 @@ async function parseResponseBody(response) {
   }
 }
 
+// --- Вспомогательная функция для замыкания кольца полигона ---
+// Принимает массив координат Leaflet ([lat, lng])
+const ensurePolygonClosed = (coordinates) => {
+  if (!coordinates || coordinates.length < 3) {
+    return coordinates; // Недостаточно точек для полигона
+  }
+
+  // Создаем копию массива, чтобы не мутировать оригинал
+  let cleanedCoordinates = [...coordinates];
+
+  // Удаляем дублирующиеся точки в конце, если последняя точка совпадает с предпоследней
+  // Это важно, потому что Leaflet Draw иногда добавляет последнюю точку дважды
+  while (cleanedCoordinates.length >= 2 &&
+         cleanedCoordinates[cleanedCoordinates.length - 1][0] === cleanedCoordinates[cleanedCoordinates.length - 2][0] &&
+         cleanedCoordinates[cleanedCoordinates.length - 1][1] === cleanedCoordinates[cleanedCoordinates.length - 2][1]) {
+    cleanedCoordinates.pop();
+  }
+
+  // После очистки, убеждаемся, что кольцо замкнуто (первая и последняя точки совпадают)
+  const firstPoint = cleanedCoordinates[0];
+  const lastPoint = cleanedCoordinates[cleanedCoordinates.length - 1];
+
+  if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
+    // Если не совпадают, добавляем первую точку в конец
+    return [...cleanedCoordinates, firstPoint];
+  }
+  return cleanedCoordinates; // Кольцо уже замкнуто или было замкнуто после очистки
+};
+
+
 export default function PolygonDrawMap({ handleLogout }) {
   const [polygons, setPolygons] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -48,41 +78,34 @@ export default function PolygonDrawMap({ handleLogout }) {
   // Состояние для диалога подтверждения очистки
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
-  // НОВЫЕ СОСТОЯНИЯ ДЛЯ АНАЛИЗА SENTINEL
-  const [activeAnalysisType, setActiveAnalysisType] = useState(null); // 'NDVI', 'FALSE_COLOR', etc., or null
-  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
-  const [analysisError, setAnalysisError] = useState(null);
-  const today = new Date();
-  const defaultEndDate = today.toISOString().split('T')[0];
-  const defaultStartDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30).toISOString().split('T')[0];
-  const [analysisDateRange, setAnalysisDateRange] = useState({ from: defaultStartDate, to: defaultEndDate });
+  // Новые состояния для аналитических слоев
+  const [activeAnalysisType, setActiveAnalysisType] = useState(null);
+  const [analysisDateRange, setAnalysisDateRange] = useState({ from: '', to: '' });
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false); // Индикатор загрузки аналитического слоя
 
 
   // Функция для отображения тост-уведомлений
-  const showToast = useCallback((message, type = 'info', duration = 5000) => {
+  const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type, visible: true });
     const timer = setTimeout(() => {
       setToast(prev => ({ ...prev, visible: false }));
-    }, duration); 
-    return () => clearTimeout(timer); 
+    }, 5000); // Сообщение исчезнет через 5 секунд
+    return () => clearTimeout(timer); // Очистка таймера
   }, []);
 
   // --- Функции для расчета и форматирования площади ---
   const calculateArea = useCallback((coordinates) => {
-    // Убедимся, что coordinates является массивом массивов, и берем первое кольцо
-    const outerRing = Array.isArray(coordinates[0][0]) ? coordinates[0] : coordinates;
-
-    if (outerRing.length < 3) return 0; 
+    if (coordinates.length < 3) return 0; 
     const toRadians = (deg) => (deg * Math.PI) / 180;
     const R = 6371000; 
     let area = 0;
-    const n = outerRing.length;
+    const n = coordinates.length;
 
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n; 
-      const lat1 = toRadians(outerRing[i][0]);
-      const lat2 = toRadians(outerRing[j][0]);
-      const deltaLon = toRadians(outerRing[j][1] - outerRing[i][1]);
+      const lat1 = toRadians(coordinates[i][0]);
+      const lat2 = toRadians(coordinates[j][0]);
+      const deltaLon = toRadians(coordinates[j][1] - coordinates[i][1]);
 
       const E =
         2 *
@@ -149,7 +172,7 @@ export default function PolygonDrawMap({ handleLogout }) {
     } catch (error) {
       console.error('Ошибка при загрузке культур:', error);
       setCropsError('Не удалось загрузить список культур. Используются резервные данные.');
-      const fallbackCrops = ['Томаты', 'Огурцы', 'Морковь', 'Свёкла', 'Лук', 'Чеснок', 'Картофель', 'Капуста', 'Перец', 'Баклажаны', 'Кабачки', 'Тыква', 'Редис', 'Петрушка', 'Укроп', 'Салат', 'Шпинат', 'Брокколи', 'Цветная капуста', 'Брюссельская капуста'];
+      const fallbackCrops = ['Томаты', 'Огурцы', 'Морковь', 'Свёкла', 'Лук', 'Чеснок', 'Картофель', 'Капуста', 'Перец', 'Баклажаны', 'Кабачки', 'Тыква', 'Rедис', 'Петрушка', 'Укроп', 'Салат', 'Шпинат', 'Брокколи', 'Цветная капуста', 'Брюссельская капуста'];
       setCrops(fallbackCrops);
       showToast(`Ошибка при загрузке культур: ${error.message}`, 'error');
     } finally {
@@ -172,12 +195,16 @@ export default function PolygonDrawMap({ handleLogout }) {
       return;
     }
 
+    // Преобразуем Leaflet [lat, lng] в GeoJSON [lng, lat]
+    // И сразу замыкаем кольцо
+    let geoJsonCoords = ensurePolygonClosed(coordinates).map(coord => [coord[1], coord[0]]);
+
     // Формируем GeoJSON Geometry (ТОЛЬКО геометрию, без Feature и properties)
     const geoJsonGeometry = {
         type: "Polygon",
-        coordinates: [coordinates.map(coord => [coord[1], coord[0]])] // Leaflet [lat, lng] to GeoJSON [lng, lat]
+        coordinates: [geoJsonCoords] // Теперь это строка только с геометрией
     };
-    const geoJsonString = JSON.stringify(geoJsonGeometry); // Теперь это строка только с геометрией
+    const geoJsonString = JSON.stringify(geoJsonGeometry); 
 
     const token = localStorage.getItem('token'); 
     if (!token) {
@@ -257,7 +284,6 @@ export default function PolygonDrawMap({ handleLogout }) {
     setIsEditingMode(false);
     setEditingMapPolygon(null); 
     editableFGRef.current?.clearLayers(); // Очищаем временный слой редактирования
-    setActiveAnalysisType(null); // Отключаем аналитический слой при рисовании
     showToast('Режим рисования активирован. Кликайте для добавления точек.', 'info');
   };
 
@@ -273,9 +299,12 @@ export default function PolygonDrawMap({ handleLogout }) {
   // Коллбэк, вызываемый DrawingHandler при завершении рисования (двойной клик)
   const onPolygonComplete = useCallback((coordinates) => {
     console.log('onPolygonComplete: New polygon completed', coordinates);
+    // Замыкаем кольцо сразу после получения координат от DrawingHandler
+    const closedCoordinates = ensurePolygonClosed(coordinates);
+
     const newPolygon = {
       id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, // Временный ID
-      coordinates: coordinates,
+      coordinates: closedCoordinates, // Используем уже замкнутые координаты
       color: `hsl(${Math.random() * 360}, 70%, 50%)`, 
       crop: null, 
       name: `Новый полигон ${new Date().toLocaleString()}`,
@@ -310,7 +339,6 @@ export default function PolygonDrawMap({ handleLogout }) {
       setIsEditingMode(false);
       setEditingMapPolygon(null);
     }
-    setActiveAnalysisType(null); // Отключаем аналитический слой при удалении
     showToast('Полигон удален локально. Отправка запроса на сервер...', 'info');
 
     try {
@@ -368,7 +396,6 @@ export default function PolygonDrawMap({ handleLogout }) {
     setIsEditingMode(false);
     setEditingMapPolygon(null);
     editableFGRef.current?.clearLayers(); // Очищаем временный слой редактирования
-    setActiveAnalysisType(null); // Отключаем аналитический слой при очистке всех полигонов
     showToast('Все полигоны удалены локально. Отправка запроса на сервер...', 'info');
 
     const token = localStorage.getItem('token');
@@ -432,6 +459,8 @@ export default function PolygonDrawMap({ handleLogout }) {
 
   // Обновить культуру для конкретного полигона (в локальном состоянии и затем в БД)
   const updatePolygonCrop = useCallback((polygonId, newCrop) => {
+    console.log(`updatePolygonCrop: Updating polygon ${polygonId} with crop ${newCrop}.`);
+    // Обновляем локальное состояние (вызовет сохранение в localStorage)
     setPolygons((prev) => {
       const updatedPolys = prev.map((p) => (p.id === polygonId ? { ...p, crop: newCrop } : p));
       return updatedPolys; 
@@ -441,6 +470,8 @@ export default function PolygonDrawMap({ handleLogout }) {
 
   // Обновление имени полигона (в локальном состоянии и затем в БД)
   const updatePolygonName = useCallback((polygonId, newName) => {
+    console.log(`updatePolygonName: Updating polygon ${polygonId} with name ${newName}.`);
+    // Обновляем локальное состояние (вызовет сохранение в localStorage)
     setPolygons((prev) => {
       const updatedPolys = prev.map((p) =>
         p.id === polygonId ? { ...p, name: newName } : p
@@ -452,6 +483,7 @@ export default function PolygonDrawMap({ handleLogout }) {
 
   // НОВАЯ ФУНКЦИЯ: Обновление комментария полигона (в локальном состоянии и затем в БД)
   const updatePolygonComment = useCallback((polygonId, newComment) => {
+    console.log(`updatePolygonComment: Updating polygon ${polygonId} with comment ${newComment}.`);
     setPolygons((prev) => {
       const updatedPolys = prev.map((p) =>
         p.id === polygonId ? { ...p, comment: newComment } : p
@@ -460,6 +492,43 @@ export default function PolygonDrawMap({ handleLogout }) {
     });
     // Сохранение в БД будет вызвано onBlur в MapSidebar
   }, []);
+
+  // Коллбэк для выбора аналитического слоя для полигона
+  const onSelectAnalysisForPolygon = useCallback((polygonId, analysisType) => {
+    console.log(`onSelectAnalysisForPolygon: Selected polygon ${polygonId} for analysis type ${analysisType}`);
+    
+    // Если выбран тот же полигон и тот же тип анализа, то выключаем слой
+    if (selectedPolygon === polygonId && activeAnalysisType === analysisType) {
+      setActiveAnalysisType(null); // Выключаем активный тип анализа
+      setSelectedPolygon(null); // Сбрасываем выбранный полигон
+      showToast(`Слой "${analysisType}" для полигона выключен.`, 'info');
+    } else {
+      setSelectedPolygon(polygonId); // Устанавливаем выбранный полигон
+      setActiveAnalysisType(analysisType); // Устанавливаем активный тип анализа
+      
+      // Устанавливаем диапазон дат для анализа (можно сделать динамическим, но пока фиксировано)
+      const today = new Date();
+      // Получаем дату за 2 месяца до текущей
+      const twoMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, today.getDate());
+      setAnalysisDateRange({
+        from: twoMonthsAgo.toISOString().split('T')[0], // ФорматГГГГ-MM-DD
+        to: today.toISOString().split('T')[0] // ФорматГГГГ-MM-DD
+      });
+
+      showToast(`Загрузка слоя "${analysisType}" для полигона...`, 'info');
+    }
+  }, [selectedPolygon, activeAnalysisType, showToast]); // Добавил selectedPolygon и activeAnalysisType в зависимости
+
+  // Коллбэк для обновления состояния загрузки аналитического слоя
+  const handleAnalysisLoadingChange = useCallback((isLoading) => {
+    setIsAnalysisLoading(isLoading);
+  }, []);
+
+  // Коллбэк для обработки ошибок аналитического слоя
+  const handleAnalysisError = useCallback((errorMessage) => {
+    showToast(errorMessage, 'error');
+    setActiveAnalysisType(null); // Сбрасываем активный тип анализа при ошибке
+  }, [showToast]);
 
 
   // --- Логика редактирования полигона с помощью react-leaflet-draw ---
@@ -498,7 +567,6 @@ export default function PolygonDrawMap({ handleLogout }) {
     setIsEditingMode(true); 
     setEditingMapPolygon(polygonToEdit); // Передаем полигон для редактирования в MapComponent
     setSelectedPolygon(polygonToEdit.id); 
-    setActiveAnalysisType(null); // Отключаем аналитический слой при редактировании
     showToast(`Начато редактирование формы полигона "${polygonToEdit.name || polygonToEdit.id}".`, 'info');
     console.log('[handleEditPolygon] isEditingMode set to TRUE. isSavingPolygon and isFetchingPolygons set to FALSE.');
     // Важно: Здесь мы БОЛЬШЕ НЕ добавляем слой в editableFGRef.current напрямую и не вызываем .enable() здесь.
@@ -507,6 +575,8 @@ export default function PolygonDrawMap({ handleLogout }) {
 
   // Функция для программной остановки и сохранения редактирования (как формы, так и карты)
   const handleStopAndSaveEdit = useCallback(() => {
+    console.log('handleStopAndSaveEdit: Attempting to stop and save.');
+    // Если мы в режиме рисования, завершаем рисование (и очищаем DrawingHandler)
     if (isDrawing) {
       if (window.clearCurrentPath) window.clearCurrentPath(); 
       stopDrawing(); 
@@ -516,6 +586,7 @@ export default function PolygonDrawMap({ handleLogout }) {
     else if (isEditingMode && editableFGRef.current) {
       editableFGRef.current.eachLayer(layer => {
         if (layer.editing && layer.editing.enabled()) {
+          console.log('handleStopAndSaveEdit: Disabling editing for active layer.');
           layer.editing.disable(); 
           
           if (editingMapPolygon) { 
@@ -536,10 +607,10 @@ export default function PolygonDrawMap({ handleLogout }) {
           }
         }
       });
+      console.log('handleStopAndSaveEdit: Forcing state reset for editing mode.');
       setIsEditingMode(false);
       setEditingMapPolygon(null); 
       editableFGRef.current?.clearLayers(); 
-      setActiveAnalysisType(null); // Отключаем аналитический слой при завершении редактирования
       showToast('Редактирование завершено и сохранено.', 'success');
     } else {
       showToast('Нет активных режимов для сохранения.', 'info');
@@ -611,7 +682,8 @@ export default function PolygonDrawMap({ handleLogout }) {
 
               // Проверяем, является ли это чистой геометрией Polygon
               if (geoJsonObj && geoJsonObj.type === "Polygon" && geoJsonObj.coordinates && geoJsonObj.coordinates[0]) {
-                  coordinates = geoJsonObj.coordinates[0].map(coord => [coord[1], coord[0]]); // [lng, lat] to [lat, lng]
+                  // Замыкаем кольцо при загрузке, на всякий случай
+                  coordinates = ensurePolygonClosed(geoJsonObj.coordinates[0].map(coord => [coord[1], coord[0]])); // [lng, lat] to [lat, lng]
               } 
               else {
                   // Если структура не соответствует Polygon
@@ -642,7 +714,6 @@ export default function PolygonDrawMap({ handleLogout }) {
           setEditingMapPolygon(null);
           editableFGRef.current?.clearLayers(); 
           setSelectedPolygon(null); 
-          setActiveAnalysisType(null); // Отключаем аналитический слой при загрузке новых полигонов
         } else {
           showToast('Сервер вернул некорректный формат данных для полигонов.', 'error');
           console.error('Сервер вернул некорректный формат данных:', data);
@@ -666,7 +737,12 @@ export default function PolygonDrawMap({ handleLogout }) {
         // Дополнительная валидация, чтобы убедиться, что данные выглядят как массив полигонов
         // Теперь также проверяем наличие 'comment'
         if (Array.isArray(parsedPolygons) && parsedPolygons.every(p => p && p.coordinates && Array.isArray(p.coordinates) && p.coordinates.length >= 3 && 'comment' in p)) {
-          setPolygons(parsedPolygons);
+          // Замыкаем кольцо для полигонов, загруженных из localStorage
+          const closedPolygons = parsedPolygons.map(p => ({
+            ...p,
+            coordinates: ensurePolygonClosed(p.coordinates)
+          }));
+          setPolygons(closedPolygons);
           showToast('Полигоны загружены с локального устройства.', 'success');
           loadedFromLocalStorage = true;
         } else {
@@ -688,67 +764,37 @@ export default function PolygonDrawMap({ handleLogout }) {
     }
   }, [showToast, showMyPolygons]); // showMyPolygons в зависимостях, чтобы гарантировать его актуальность
 
-  // --- Sentinel Analysis Handlers ---
-  // Функция, вызываемая из PolygonAndMarkerLayer при выборе слоя из Popup
-  const handleSelectAnalysisForPolygon = useCallback((polygonId, analysisType) => {
-    setAnalysisError(null); // Сбрасываем предыдущие ошибки
-    setSelectedPolygon(polygonId); // Устанавливаем выбранный полигон
-    if (activeAnalysisType === analysisType) {
-        setActiveAnalysisType(null); // Если тот же тип, выключаем
-        showToast(`Аналитический слой "${analysisType}" отключен.`, 'info');
-    } else {
-        setActiveAnalysisType(analysisType); // Устанавливаем новый тип
-        showToast(`Активирован аналитический слой: ${analysisType}.`, 'info');
-    }
-    // При активации анализа отключаем режимы рисования/редактирования
-    if (isDrawing) setIsDrawing(false);
-    if (isEditingMode) handleStopAndSaveEdit(); // Завершаем редактирование, если активно
-  }, [activeAnalysisType, isDrawing, isEditingMode, handleStopAndSaveEdit, showToast]);
+  // Получаем данные выбранного полигона для PolygonAnalysisLayer
+  const selectedPolygonDataForAnalysis = selectedPolygon 
+    ? polygons.find(p => p.id === selectedPolygon) 
+    : null;
 
-  const handleAnalysisLoadingChange = useCallback((isLoading) => {
-    setIsAnalysisLoading(isLoading);
-  }, []);
-
-  const handleAnalysisError = useCallback((errorMsg) => {
-    setAnalysisError(errorMsg);
-    showToast(errorMsg, 'error', 5000); // Показываем ошибку в тосте
-  }, [showToast]);
-
-  // Функция для установки диапазона дат из MapSidebar
-  const handleAnalysisDateRangeChange = useCallback((newRange) => {
-    setAnalysisDateRange(newRange);
-    // Если активен какой-либо анализ, перезапускаем его с новыми датами
-    if (activeAnalysisType) {
-        // Деактивируем и снова активируем, чтобы PolygonAnalysisLayer обновился
-        // Можно также просто вызвать fetchAnalysisImage напрямую в PolygonAnalysisLayer
-        // при изменении analysisDateRange
-        setActiveAnalysisType(null); // Деактивируем
-        setTimeout(() => setActiveAnalysisType(activeAnalysisType), 50); // Затем активируем
-        showToast('Диапазон дат изменен, аналитический слой будет обновлен.', 'info');
-    }
-  }, [activeAnalysisType, showToast]);
+  // Если полигон найден, убедимся, что его координаты замкнуты перед передачей
+  const finalSelectedPolygonData = selectedPolygonDataForAnalysis 
+    ? { 
+        ...selectedPolygonDataForAnalysis, 
+        coordinates: ensurePolygonClosed(selectedPolygonDataForAnalysis.coordinates) 
+      }
+    : null;
 
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100%' }}>
       <MapComponent
-          polygons={polygons}
-          onPolygonComplete={onPolygonComplete}
-          onPolygonEdited={onPolygonEdited}
-          isDrawing={isDrawing}
-          setIsDrawing={setIsDrawing}
-          editableFGRef={editableFGRef}
-          selectedPolygon={selectedPolygon}
-          isEditingMode={isEditingMode}
-          editingMapPolygon={editingMapPolygon}
-          onSelectAnalysisForPolygon={handleSelectAnalysisForPolygon} // <-- Этот пропс уже был
-
-          // НОВЫЕ ПРОПСЫ ДЛЯ АНАЛИЗА
-          activeAnalysisType={activeAnalysisType}
-          isAnalysisLoading={isAnalysisLoading}
-          onLoadingChange={handleAnalysisLoadingChange}
-          onError={handleAnalysisError}
-          analysisDateRange={analysisDateRange}
+        polygons={polygons}
+        onPolygonComplete={onPolygonComplete}
+        onPolygonEdited={onPolygonEdited}
+        isDrawing={isDrawing}
+        setIsDrawing={setIsDrawing}
+        editableFGRef={editableFGRef}
+        selectedPolygon={selectedPolygon} 
+        isEditingMode={isEditingMode} 
+        editingMapPolygon={editingMapPolygon} // <-- Передаем полигон для редактирования
+        onSelectAnalysisForPolygon={onSelectAnalysisForPolygon} // НОВЫЙ ПРОП: Передаем функцию выбора анализа
+        activeAnalysisType={activeAnalysisType} // НОВЫЙ ПРОП: Передаем активный тип анализа
+        analysisDateRange={analysisDateRange} // НОВЫЙ ПРОП: Передаем диапазон дат анализа
+        onLoadingChange={handleAnalysisLoadingChange} // НОВЫЙ ПРОП: Передаем коллбэк для загрузки
+        onError={handleAnalysisError} // НОВЫЙ ПРОП: Передаем коллбэк для ошибок
       />
 
       <MapSidebar
@@ -779,21 +825,6 @@ export default function PolygonDrawMap({ handleLogout }) {
         isFetchingPolygons={isFetchingPolygons} 
         showCropsSection={(polygons && polygons.length > 0) || isDrawing || isEditingMode || selectedPolygon} 
         savePolygonToDatabase={savePolygonToDatabase} 
-        
-        // Пропсы для аналитических слоев
-        onActivateAnalysis={(type) => {
-            // Эта функция будет вызываться из MapSidebar для активации/деактивации анализа
-            // Если выбран полигон, то активируем анализ для него
-            if (selectedPolygon) {
-                handleSelectAnalysisForPolygon(selectedPolygon, type);
-            } else {
-                showToast('Выберите полигон, чтобы активировать аналитические слои.', 'warning');
-            }
-        }} 
-        activeAnalysisType={activeAnalysisType} 
-        isAnalysisLoading={isAnalysisLoading}
-        onDateRangeChange={handleAnalysisDateRangeChange} 
-        analysisDateRange={analysisDateRange} 
       />
 
       {(isDrawing || isEditingMode) && (
@@ -857,9 +888,9 @@ export default function PolygonDrawMap({ handleLogout }) {
       )}
 
       {/* Рендерим PolygonAnalysisLayer только если есть выбранный полигон и активный тип анализа */}
-      {selectedPolygon && activeAnalysisType && (
+      {finalSelectedPolygonData && activeAnalysisType && (
         <PolygonAnalysisLayer
-          selectedPolygonData={polygons.find(p => p.id === selectedPolygon)} // Передаем полный объект полигона
+          selectedPolygonData={finalSelectedPolygonData} // Передаем полный объект полигона с замкнутым кольцом
           activeAnalysisType={activeAnalysisType}
           analysisDateRange={analysisDateRange}
           onLoadingChange={handleAnalysisLoadingChange}
@@ -873,7 +904,6 @@ export default function PolygonDrawMap({ handleLogout }) {
           position: 'absolute', bottom: '15px', left: '50%', transform: 'translateX(-50%)',
           backgroundColor: 'rgba(0, 0, 0, 0.7)', color: 'white', padding: '10px 20px',
           borderRadius: '8px', zIndex: 1000, fontSize: '14px', textAlign: 'center',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
         }}>
           Загрузка аналитического слоя...
         </div>
