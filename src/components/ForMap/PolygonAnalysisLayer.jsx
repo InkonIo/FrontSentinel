@@ -1,4 +1,3 @@
-// components/ForMap/PolygonAnalysisLayer.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { ImageOverlay } from 'react-leaflet';
 import L from 'leaflet';
@@ -7,15 +6,15 @@ import L from 'leaflet';
 // Он должен быть ТОЛЬКО корнем вашего домена/приложения, без '/api' или '/polygons'.
 // Например: 'http://localhost:8080' для локальной разработки, или
 // 'https://your-backend-app.com' для вашего развернутого бэкенда.
-const BASE_API_URL = 'http://localhost:8080';
+const BASE_API_URL = 'https://newback-production-aa83.up.railway.app'; // Обновленный URL
 
 export default function PolygonAnalysisLayer({
   map, // Теперь принимаем map как пропс
   selectedPolygonData, // Полные данные выбранного полигона (включая coordinates)
-  activeAnalysisType,  // Например: 'NDVI', 'TRUE_COLOR'
-  analysisDateRange,   // Объект { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
-  onLoadingChange,     // Коллбэк для уведомления родителя о состоянии загрузки
-  onError              // Коллбэк для уведомления родителя об ошибках
+  activeAnalysisType,   // Например: 'NDVI', 'TRUE_COLOR'
+  analysisDateRange,    // Объект { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
+  onLoadingChange,      // Коллбэк для уведомления родителя о состоянии загрузки
+  onError               // Коллбэк для уведомления родителя об ошибках
 }) {
   const [analysisImageUrl, setAnalysisImageUrl] = useState(null);
   const [imageBounds, setImageBounds] = useState(null); // Границы для ImageOverlay
@@ -23,10 +22,10 @@ export default function PolygonAnalysisLayer({
   // Функция для запроса аналитического изображения с бэкенда
   const fetchAnalysisImage = useCallback(async () => {
     console.log('fetchAnalysisImage: Проверка зависимостей...');
-    console.log('  selectedPolygonData:', selectedPolygonData);
-    console.log('  activeAnalysisType:', activeAnalysisType);
-    console.log('  analysisDateRange:', analysisDateRange);
-    console.log('  map:', map);
+    console.log('   selectedPolygonData:', selectedPolygonData);
+    console.log('   activeAnalysisType:', activeAnalysisType);
+    console.log('   analysisDateRange:', analysisDateRange);
+    console.log('   map:', map);
 
     // Проверяем наличие необходимых данных, включая map
     if (!selectedPolygonData || !activeAnalysisType || !analysisDateRange || !map) {
@@ -53,8 +52,8 @@ export default function PolygonAnalysisLayer({
       // Leaflet-Draw обычно возвращает массив [lat, lng] для простых полигонов.
       // Если это массив массивов (например, [[lat, lng], [lat, lng]]), берем первое кольцо.
       const outerRing = Array.isArray(selectedPolygonData.coordinates[0]) && Array.isArray(selectedPolygonData.coordinates[0][0])
-                        ? selectedPolygonData.coordinates[0]
-                        : selectedPolygonData.coordinates;
+                           ? selectedPolygonData.coordinates[0]
+                           : selectedPolygonData.coordinates;
 
       if (outerRing.length < 3) {
         console.error('fetchAnalysisImage: Полигон содержит менее 3 точек, невозможно сформировать действительный полигон.');
@@ -100,7 +99,7 @@ export default function PolygonAnalysisLayer({
       }
 
       console.log('fetchAnalysisImage: Отправка запроса к API...');
-      const response = await fetch(`${BASE_API_URL}/api/sentinel/process-image`, {
+      const response = await fetch(`${BASE_API_URL}/api/sentinel/process-image`, { // Обновленный URL
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

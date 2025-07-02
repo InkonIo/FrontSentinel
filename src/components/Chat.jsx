@@ -3,7 +3,10 @@ import './Chat.css';
 
 // Максимальное количество сообщений в истории, отправляемых в OpenAI API
 // Это помогает избежать ошибки "context_length_exceeded"
-const MAX_MESSAGES_IN_HISTORY = 50; // Можно настроить это значение
+const MAX_MESSAGES_IN_HISTORY = 20; // Можно настроить это значение
+
+// Новый базовый URL для вашего развернутого бэкенда
+const BASE_API_URL = 'https://newback-production-aa83.up.railway.app';
 
 export default function ChatPage() {
   const [message, setMessage] = useState("");
@@ -45,6 +48,7 @@ export default function ChatPage() {
     const selectedPolygon = userPolygons.find(p => p.id === polygonId);
     let polygonContext = "";
     if (selectedPolygon) {
+        // Изменено системное сообщение для более явного указания ИИ использовать геоданные
         polygonContext = `Ты работаешь с полигоном. Вот его данные: Название: "${selectedPolygon.name}", Культура: "${selectedPolygon.crop}". Комментарий: "${selectedPolygon.comment || 'нет'}"`;
         
         // Добавляем геоданные, если они есть.
@@ -123,7 +127,7 @@ export default function ChatPage() {
     }));
 
     try {
-      const res = await fetch(`https://newback-production-aa83.up.railway.app/api/chat/polygons/${polygonId}/messages`, {
+      const res = await fetch(`${BASE_API_URL}/api/chat/polygons/${polygonId}/messages`, { // Использование BASE_API_URL
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +176,7 @@ export default function ChatPage() {
       setIsTyping(false);
       setMessage('');
     }
-  }, [jwtToken, userPolygons]); // Добавлен userPolygons в зависимости
+  }, [jwtToken, userPolygons]);
 
   // Функция для загрузки истории чата для конкретного полигона
   // Теперь возвращает загруженные данные
@@ -183,7 +187,7 @@ export default function ChatPage() {
       return []; // Возвращаем пустой массив в случае ошибки
     }
     try {
-      const res = await fetch(`https://newback-production-aa83.up.railway.app/api/chat/polygons/${polygonId}`, {
+      const res = await fetch(`${BASE_API_URL}/api/chat/polygons/${polygonId}`, { // Использование BASE_API_URL
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -228,7 +232,7 @@ export default function ChatPage() {
       return;
     }
     try {
-      const res = await fetch('https://newback-production-aa83.up.railway.app/api/polygons/my', {
+      const res = await fetch(`${BASE_API_URL}/api/polygons/my`, { // Использование BASE_API_URL
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -322,7 +326,7 @@ export default function ChatPage() {
     setIsTyping(true); // Показываем индикатор печати, пока идет удаление
 
     try {
-      const res = await fetch(`https://newback-production-aa83.up.railway.app/api/chat/polygons/${selectedPolygonId}/messages`, {
+      const res = await fetch(`${BASE_API_URL}/api/chat/polygons/${selectedPolygonId}/messages`, { // Использование BASE_API_URL
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${jwtToken}`
