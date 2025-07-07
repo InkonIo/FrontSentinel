@@ -3,9 +3,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'; // До
 import { useNavigate, useLocation } from 'react-router-dom';
 import './MapSidebar.css'; // Импортируем новый CSS для MapSidebar
 
-// --- Вспомогательные функции для парсинга/комбинирования культуры и комментария ---
-// Эти функции больше не нужны, так как crop и comment теперь отдельные поля
-
 export default function MapSidebar({
   polygons,               // Массив всех полигонов
   selectedPolygon,        // ID выбранного полигона (для выделения)
@@ -14,7 +11,7 @@ export default function MapSidebar({
   handleEditPolygon,      // Функция для начала редактирования формы полигона на карте
   crops,                  // Список доступных культур
   loadingCrops,           // Состояние загрузки списка культур (культур)
-  cropsError,             // Ошибка при загрузке культур
+  cropsError,             // Ошибка при загрузке культурaa
   fetchCropsFromAPI,      // Функция для повторной загрузки культур
   clearAllCrops,          // Функция для очистки всех культур с полигонов
   updatePolygonCrop,      // Функция для обновления культуры полигона (теперь принимает чистую культуру)
@@ -22,7 +19,7 @@ export default function MapSidebar({
   formatArea,             // Функция для форматирования площади
   startDrawing,           // Функция для начала режима рисования
   stopDrawing,            // Функция для остановки режима рисования
-  handleStopAndSaveEdit,  // Новая функция для остановки и сохранения редактирования
+  handleStopAndSaveEdit,  // Новая функция для остановки и сохранения редактирования (теперь для общего сохранения)
   isDrawing,              // Текущее состояние режима рисования
   isEditingMode,          // Новое состояние: активен ли режим редактирования (редактирование формы на карте)
   clearAll,               // Функция для очистки всех полигонов (теперь запускает подтверждение)
@@ -95,7 +92,8 @@ export default function MapSidebar({
   };
 
   // Определяем, должна ли кнопка "Остановить и сохранить" быть активной
-  const isSaveButtonActive = isDrawing || isEditingMode;
+  // Эта логика теперь будет применяться к новой кнопке "Сохранить" внутри полигона
+  // const isSaveButtonActive = isDrawing || isEditingMode; // Удалено или изменено
 
   return (
     <div style={sidebarStyle}>
@@ -157,16 +155,8 @@ export default function MapSidebar({
           {isDrawing ? '✏️ Рисую...' : '✏️ Начать рисование'}
         </button>
 
-        <button
-          onClick={handleStopAndSaveEdit} 
-          disabled={!isSaveButtonActive || isSavingPolygon || isFetchingPolygons}
-          style={{ ...buttonStyle, 
-            backgroundColor: isSaveButtonActive ? '#ff9800' : '#f0f0f0', 
-            color: isSaveButtonActive ? 'white' : '#666' 
-          }}
-        >
-          {isSavingPolygon ? '💾 Сохраняю...' : (isEditingMode ? '💾 Сохранить изменения' : '💾 Остановить и сохранить')}
-        </button>
+        {/* Кнопка "Остановить и сохранить" удалена отсюда */}
+        {/* Она будет перемещена внутрь каждого элемента полигона */}
 
         <button
           onClick={clearAll} 
@@ -281,6 +271,24 @@ export default function MapSidebar({
                     >
                       ✏️ Редактировать Форму
                     </button>
+                    {/* НОВАЯ КНОПКА: Сохранить изменения полигона */}
+                    {(selectedPolygon === polygon.id && (isEditingMode || isDrawing)) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleStopAndSaveEdit(polygon.id); }}
+                        disabled={!isEditingMode && !isDrawing || isSavingPolygon || isFetchingPolygons}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: (!isEditingMode && !isDrawing || isSavingPolygon || isFetchingPolygons) ? '#cccccc' : '#28a745', // Зеленый цвет
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: (!isEditingMode && !isDrawing || isSavingPolygon || isFetchingPolygons) ? 'not-allowed' : 'pointer',
+                          fontSize: '11px',
+                        }}
+                      >
+                        {isSavingPolygon ? '💾 Сохраняю...' : '💾 Сохранить'}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div 

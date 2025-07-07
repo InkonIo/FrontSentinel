@@ -16,12 +16,9 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const [hideIntro, setHideIntro] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  
   const [selectedPolygonId, setSelectedPolygonId] = useState(null); 
-  
   const [jwtToken, setJwtToken] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
-
   const [userPolygons, setUserPolygons] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false); // Состояние для управления видимостью модального окна
 
@@ -49,7 +46,7 @@ export default function ChatPage() {
     let polygonContext = "";
     if (selectedPolygon) {
         // Изменено системное сообщение для более явного указания ИИ использовать геоданные
-        polygonContext = `Ты работаешь с полигоном. Вот его данные: Название: "${selectedPolygon.name}", Культура: "${selectedPolygon.crop}". Комментарий: "${selectedPolygon.comment || 'нет'}"`;
+        polygonContext = `Ты работаешь с полигоном. Вот его данные: Название: "${selectedPolygon.name}", Культура: "${selectedPolygon.crop}". Комментарий: "${selectedPolygon.comment || 'нет'}".`;
         
         // Добавляем геоданные, если они есть.
         // ВНИМАНИЕ: большие geo_json могут быстро превысить лимит токенов!
@@ -89,6 +86,10 @@ export default function ChatPage() {
                 polygonContext += ` Геоданные (не удалось распарсить): ${selectedPolygon.geo_json}`;
             }
         }
+        // НОВАЯ ИНСТРУКЦИЯ ДЛЯ ИИ: отвечать кратко и интересно
+        // Когда тебя спрашивают об общей информации по текущему полигону (например, "расскажи мне инфу про этот полигон"),
+        // отвечай кратко (2-3 предложения), фокусируясь на названии полигона и его культуре. Сделай ответ интересным.
+        polygonContext += ` Когда тебя спрашивают об общей информации по текущему полигону (например, "расскажи мне инфу про этот полигон"), отвечай кратко (2-3 предложения), фокусируясь на названии полигона и его культуре. Сделай ответ интересным.`;
     }
 
     // Формируем сообщения для OpenAI API, включая предыдущий контекст
@@ -154,6 +155,7 @@ export default function ChatPage() {
         return;
       }
       const data = await res.json(); 
+      console.log(`[sendMessageToBackend] Получен ответ от бэкенда для полигона ${polygonId}:`, data); // ADDED LOG
 
       const botResponse = data.error ? data.error : data.reply;
 
@@ -205,25 +207,27 @@ export default function ChatPage() {
         return []; // Возвращаем пустой массив в случае ошибки
       }
       const data = await res.json();
+      console.log(`[fetchPolygonChatHistory] Получена история чата для полигона ${polygonId}:`, data); // ADDED LOG
       
       setChatHistories(prev => ({
         ...prev,
         [polygonId]: data.map(msg => ({ sender: msg.sender, text: msg.text }))
       }));
+      setCurrentMessages(data.map(msg => ({ sender: msg.sender, text: msg.text }))); // Explicitly update currentMessages
       return data; // Возвращаем загруженные данные
     } catch (error) {
       console.error(`Непредвиденная ошибка при загрузке истории чата для полигона ${polygonId}:`, error);
       setCurrentMessages(prev => [...prev, { sender: 'ai', text: `Не удалось загрузить историю чата для полигона. Ошибка сети или парсинга.` }]);
       return []; // Возвращаем пустой массив в случае ошибки
     }
-  }, [jwtToken]);
+  }, [jwtToken]); // Удален currentMessages из зависимостей, так как он обновляется внутри
 
   // Функция для обработки клика по полигону
-  // Теперь просто устанавливает selectedPolygonId
   const handlePolygonClick = useCallback((polygon) => {
     setSelectedPolygonId(polygon.id); 
+    localStorage.setItem('lastSelectedPolygonId', polygon.id); // Сохраняем ID в localStorage
     setMessage(''); // Очищаем поле ввода при выборе полигона
-  }, []); // Зависимости убраны, так как эта функция только устанавливает ID
+  }, []);
 
   // Функция для загрузки полигонов пользователя
   const fetchUserPolygons = useCallback(async (token) => {
@@ -252,17 +256,25 @@ export default function ChatPage() {
       
       if (data && data.length > 0) {
         setUserPolygons(data);
-        const initialChatHistories = {};
+        const initialChatHistories = {}; // Перенесено сюда, чтобы не очищать глобально
         data.forEach(polygon => {
           initialChatHistories[polygon.id] = []; 
         });
-        setChatHistories(initialChatHistories);
+        setChatHistories(initialChatHistories); // Инициализируем chatHistories только здесь
         
-        // Устанавливаем selectedPolygonId, что вызовет useEffect ниже
-        setSelectedPolygonId(data[0].id); 
+        // Попытка загрузить последний выбранный полигон из localStorage
+        const lastSelectedId = localStorage.getItem('lastSelectedPolygonId');
+        if (lastSelectedId && data.some(p => p.id === lastSelectedId)) {
+          setSelectedPolygonId(lastSelectedId);
+        } else {
+          // Если нет сохраненного ID или он недействителен, выбираем первый полигон
+          setSelectedPolygonId(data[0].id); 
+          localStorage.setItem('lastSelectedPolygonId', data[0].id);
+        }
       } else {
         if (isLoggedIn) {
             setCurrentMessages(prev => [...prev, { sender: 'ai', text: 'У вас пока нет сохраненных полигонов. Создайте их, чтобы начать диалог.' }]);
+            localStorage.removeItem('lastSelectedPolygonId'); // Очищаем, если полигонов нет
         }
       }
     } catch (error) {
@@ -282,27 +294,25 @@ export default function ChatPage() {
     } else {
       setCurrentMessages(prev => [...prev, { sender: 'ai', text: 'Для использования чата необходима аутентификация. Пожалуйста, войдите на сайт.' }]);
       setIsLoggedIn(false);
+      localStorage.removeItem('lastSelectedPolygonId'); // Очищаем, если пользователь не авторизован
     }
   }, [fetchUserPolygons]); 
 
   // ЭФФЕКТ: для обработки выбранного полигона
-  // Теперь не будет автоматически отправлять промпт
   useEffect(() => {
     const processPolygonSelection = async () => {
       if (selectedPolygonId && jwtToken) {
         // Устанавливаем текущие сообщения из кэша (может быть пустым)
+        // Этот шаг важен, чтобы сразу показать то, что уже есть в кэше, пока идет загрузка
         setCurrentMessages(chatHistoriesRef.current[selectedPolygonId] || []); 
         
-        // Загружаем актуальную историю чата
+        // Загружаем актуальную историю чата для выбранного полигона
         await fetchPolygonChatHistory(selectedPolygonId, jwtToken);
-
-        // *** УДАЛЕНА ЛОГИКА АВТОМАТИЧЕСКОЙ ОТПРАВКИ ПРОМПТА ***
-        // Теперь пользователь должен сам ввести первое сообщение.
       }
     };
 
     processPolygonSelection();
-  }, [selectedPolygonId, jwtToken, fetchPolygonChatHistory, userPolygons]);
+  }, [selectedPolygonId, jwtToken, fetchPolygonChatHistory]); // userPolygons удален из зависимостей, так как fetchUserPolygons уже вызывает setSelectedPolygonId
 
   // Эффект для прокрутки сообщений
   useEffect(() => {

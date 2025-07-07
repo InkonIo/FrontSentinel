@@ -130,7 +130,7 @@ export default function MapComponent({
       />
 
       <WMSTileLayer
-        url="https://services.sentinel-hub.com/ogc/wms/f15c44d0-bbb8-4c66-b94e-6a8c7ab39349" // Ваш Instance ID
+        url="https://services.sentinel-hub.com/ogc/wms/5b29f7b4-15d8-44b1-b89e-345252847af1" // Ваш Instance ID
         layers="1_TRUE_COLOR" // Стандартное название слоя для True Color Sentinel-2 L2A
         format="image/png"
         transparent={true}
