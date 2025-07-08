@@ -1,116 +1,640 @@
 /* components/ForMap/MapSidebar.css */
 
-/* Стили для кнопки бургер-меню */
-.burger-menu-icon {
-  position: absolute; /* Абсолютное позиционирование внутри MapSidebar */
-  top: 15px;
-  right: 15px; /* Размещаем справа, чтобы не мешал контенту слева */
-  font-size: 24px;
-  color: #343a40; /* Темный цвет для видимости на светлом фоне MapSidebar */
-  background-color: white; /* Фон кнопки */
-  padding: 8px 12px;
-  border-radius: 8px; /* Более скругленные углы */
-  box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* Усиленная тень */
+/* CSS Custom Properties for Colors - EarthData theme */
+:root {
+  --dark-bg-start: rgba(17, 17, 17, 0.9);
+  --dark-bg-end: rgba(10, 10, 10, 0.9);
+  --dark-border-color: rgba(51, 51, 51, 0.6);
+  --light-text-color: #ecf0f1; /* White-ish for text */
+  --medium-text-color: #bbb; /* Grey-ish for subtitles */
+  --accent-orange-light: #fa7; /* Highlight color from EarthData */
+  --accent-orange-dark: rgba(255, 120, 0, 0.6); /* Border/shadow accent */
+}
+
+/* Base Sidebar Styles */
+.map-sidebar-container {
+  width: 25%; /* Slightly narrower */
+  min-width: 280px; /* Reduced min-width */
+  max-width: 350px; /* Reduced max-width */
+  height: 100vh;
+  overflow-y: hidden; /* Main container does not scroll */
+  padding: 15px; /* Reduced padding */
+  /* Dark, transparent background inspired by EarthData cards */
+  background: linear-gradient(145deg, var(--dark-bg-start) 0%, var(--dark-bg-end) 100%);
+  backdrop-filter: blur(10px); /* Glassmorphism effect */
+  border-left: 1px solid var(--dark-border-color);
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column; /* Changed to column for flexbox layout */
+  justify-content: space-between; /* Pushes content to top and bottom */
+  position: relative;
+  box-shadow: -6px 0 20px rgba(0,0,0,0.5); /* Slightly less pronounced shadow */
+  color: var(--light-text-color); /* Light text on dark background */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Smoother transition */
+}
+
+/* Section Wrapper for scrollable content */
+.map-sidebar-content-wrapper {
+  flex-grow: 1; /* Allows this wrapper to take available space */
+  display: flex;
+  flex-direction: column;
+  /* gap: 20px; Removed global gap, manage gaps between sections explicitly */
+  overflow-y: auto; /* Allows scrolling for the main content area */
+  padding-right: 5px; /* Add some padding to prevent content from touching the scrollbar area */
+  scrollbar-width: none; /* For Firefox */
+  -ms-overflow-style: none; /* For IE and Edge */
+}
+
+.map-sidebar-content-wrapper::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Webkit browsers */
+}
+
+
+/* Main Titles */
+.map-sidebar-section-title {
+  color: #ffffff; /* White title */
+  margin-bottom: 10px; /* Reduced margin */
+  font-size: 20px; /* Reduced font size */
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4); /* Stronger text shadow */
+}
+
+/* Horizontal Rule */
+.map-sidebar-hr {
+  border: none;
+  height: 1px; /* Thinner rule */
+  /* Orange accent line from EarthData */
+  background: linear-gradient(to right, rgba(200, 80, 0, 0.8), rgba(255, 150, 50, 0.8), rgba(200, 80, 0, 0.8));
+  margin: 0;
+  box-shadow: 0 1px 3px rgba(255, 120, 30, 0.3);
+}
+
+/* Section for buttons and controls */
+.map-sidebar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Reduced gap */
+  margin-bottom: 20px; /* Add margin to separate from next section */
+}
+
+/* Base button styles - made smaller */
+.map-sidebar-button {
+  padding: 8px 15px; /* Reduced padding */
+  border-radius: 6px; /* Smaller border-radius */
+  border: 1px solid var(--dark-border-color);
   cursor: pointer;
-  z-index: 1001; /* Поверх всего в MapSidebar */
-  transition: all 0.3s ease;
-  border: none; /* Убираем стандартную рамку */
-  display: flex; /* Для центрирования символа */
+  font-size: 13px; /* Reduced font size */
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* EarthData transition */
+  display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px; /* Reduced gap */
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3); /* Smaller shadow */
+  text-transform: uppercase;
+  letter-spacing: 0.2px; /* Reduced letter spacing */
+  color: #fff; /* White text for all buttons */
+  position: relative;
+  overflow: hidden; /* For hover effect */
 }
 
-.burger-menu-icon:hover {
-  transform: translateY(-2px) scale(1.05); /* Легкий подъем и увеличение */
-  box-shadow: 0 6px 15px rgba(0,0,0,0.25); /* Усиленная тень при наведении */
-  background-color: #f0f0f0; /* Чуть темнее при наведении */
-}
-
-.burger-menu-icon:active {
-  transform: translateY(0); /* Возврат при нажатии */
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-/* Стили для выпадающего меню */
-.map-sidebar-dropdown-menu {
+.map-sidebar-button::before {
+  content: '';
   position: absolute;
-  top: 60px; /* Ниже бургер-меню */
-  right: 15px; /* Выравнивание по правому краю MapSidebar */
-  background-color: #2c3e50; /* Темный, глубокий синий фон для меню */
-  color: white;
-  border-radius: 10px; /* Более скругленные углы */
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); /* Более выраженная тень */
-  padding: 15px; /* Увеличенный padding */
-  z-index: 999; /* Ниже бургер-иконки */
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 150, 0, 0.1), transparent);
+  transition: left 0.5s;
+}
+
+.map-sidebar-button:hover::before {
+  left: 100%;
+}
+
+.map-sidebar-button:hover {
+  border-color: var(--accent-orange-dark); /* Orange border on hover */
+  transform: translateY(-1px); /* Reduced lift */
+  box-shadow: 0 4px 15px rgba(255, 100, 0, 0.2); /* Reduced glow */
+}
+
+.map-sidebar-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+}
+
+.map-sidebar-button:disabled {
+  background: rgba(100, 100, 100, 0.5) !important; /* Darker disabled background */
+  color: #aaa !important;
+  cursor: not-allowed !important;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.7;
+  border-color: rgba(51, 51, 51, 0.6) !important;
+}
+
+/* Specific button colors */
+.map-sidebar-button.draw-button {
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.9) 0%, rgba(17, 17, 17, 0.9) 100%);
+}
+.map-sidebar-button.clear-button {
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.9) 0%, rgba(17, 17, 17, 0.9) 100%);
+}
+.map-sidebar-button.toggle-list-button {
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.9) 0%, rgba(17, 17, 17, 0.9) 100%);
+  margin-top: 15px; /* Reduced margin */
+}
+
+/* Polygon List Section */
+.polygon-list-section {
+  /* margin-top: 15px; Removed margin-top, managed by gap in wrapper */
+  flex-grow: 1; /* Allows this section to grow and push summary down */
   display: flex;
-  flex-direction: column; /* Элементы в колонку */
-  min-width: 200px; /* Увеличенная минимальная ширина */
-  height: auto; /* Высота по содержимому */
-  max-height: calc(100vh - 80px); /* Максимальная высота, чтобы не выходило за экран */
-  overflow-y: auto; /* Прокрутка, если пунктов много */
-  transform-origin: top right; /* Точка для трансформации */
-  animation: fadeInScale 0.3s ease-out forwards; /* Анимация появления */
-  border: 1px solid rgba(255, 255, 255, 0.1); /* Легкая рамка */
+  flex-direction: column;
+  min-height: 0; /* Important for flex items with overflow */
 }
 
-/* Стили для пунктов меню (ссылок) */
-.map-menu-item {
-  background: none;
-  border: none;
-  color: #ecf0f1; /* Светлый, читаемый цвет текста */
-  text-align: left;
-  padding: 12px 15px; /* Увеличенный padding */
-  font-size: 16px; /* Чуть увеличенный шрифт */
+.polygon-list-header {
+  margin: 0 0 10px 0; /* Reduced margin */
+  color: #ffffff;
+  font-size: 18px; /* Reduced font size */
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.polygon-list-container {
+  /* max-height: 25vh; Removed fixed max-height */
+  overflow-y: scroll; /* Allow scrolling */
+  scrollbar-width: none; /* For Firefox */
+  -ms-overflow-style: none; /* For IE and Edge */
+  border: 1px solid var(--dark-border-color);
+  border-radius: 10px; /* Reduced border-radius */
+  padding: 10px; /* Reduced padding */
+  /* Background should be transparent or match parent to avoid "gray part" */
+  background: transparent; /* Make it transparent */
+  /* backdrop-filter: blur(8px); Removed backdrop-filter from here, it's on the main container */
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.3); /* Reduced inset shadow */
+  flex-grow: 1; /* Allow the list itself to grow and scroll */
+}
+
+.polygon-list-container::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Webkit browsers */
+}
+
+/* Individual Polygon Item */
+.polygon-item {
+  margin-bottom: 10px; /* Reduced margin */
+  padding: 10px; /* Reduced padding */
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.8) 0%, rgba(17, 17, 17, 0.8) 100%);
+  border: 1px solid rgba(51, 51, 51, 0.6);
+  border-radius: 8px; /* Reduced border-radius */
   cursor: pointer;
-  transition: all 0.2s ease; /* Более плавная анимация */
-  width: 100%; /* Занимает всю ширину выпадающего меню */
-  border-radius: 6px; /* Скругленные углы для пунктов */
-  text-decoration: none; /* Убираем подчеркивание для ссылок */
-  display: block; /* Чтобы ссылки были блочными элементами */
-  font-family: 'Inter', sans-serif; /* Применяем шрифт */
-  margin-bottom: 5px; /* Небольшой отступ между пунктами */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3); /* Reduced shadow */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  color: var(--light-text-color);
 }
 
-.map-menu-item:last-child {
-  margin-bottom: 0; /* Убираем отступ у последнего элемента */
+.polygon-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 150, 0, 0.05), transparent); /* Subtle orange shine */
+  transition: left 0.5s;
 }
 
-.map-menu-item:hover {
-  background-color: #34495e; /* Чуть темнее при наведении */
-  transform: translateX(5px); /* Более заметное смещение */
-  color: #fff; /* Белый текст при наведении */
+.polygon-item:hover::before {
+  left: 100%;
 }
 
-.map-menu-item.active {
-  background-color: #3498db; /* Яркий синий для активного пункта */
-  font-weight: bold;
-  box-shadow: inset 0 0 10px rgba(52, 152, 219, 0.6); /* Внутренняя тень */
+.polygon-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(255, 100, 0, 0.2);
+  border-color: var(--accent-orange-dark);
+}
+
+.polygon-item.selected {
+  background: linear-gradient(145deg, rgba(34, 34, 34, 0.95) 0%, rgba(26, 26, 26, 0.95) 100%);
+  border: 2px solid var(--accent-orange-light);
+  box-shadow: 0 4px 12px rgba(255, 100, 0, 0.4);
+  transform: scale(1.005);
+}
+
+.polygon-item-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* Reduced gap */
+  margin-bottom: 6px; /* Reduced margin */
+}
+
+.polygon-name-input {
+  padding: 6px 8px; /* Reduced padding */
+  border: 1px solid rgba(100, 100, 100, 0.6);
+  border-radius: 6px; /* Reduced border-radius */
+  font-size: 13px; /* Reduced font size */
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--light-text-color);
+  background-color: rgba(50, 50, 50, 0.7); /* Darker input background */
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); /* Reduced shadow */
+}
+
+.polygon-name-input:focus {
+  outline: none;
+  border-color: var(--accent-orange-light);
+  box-shadow: 0 0 0 2px rgba(255, 150, 0, 0.3); /* Reduced focus ring */
+}
+
+.polygon-name-display {
+  color: #ffffff; /* White text */
+  font-size: 14px; /* Reduced font size */
+  font-weight: 700;
+}
+
+.polygon-actions {
+  display: flex;
+  gap: 6px; /* Reduced gap */
+  justify-content: flex-end;
+}
+
+.polygon-action-button {
+  padding: 6px 10px; /* Reduced padding */
+  border: none;
+  border-radius: 6px; /* Reduced border-radius */
+  cursor: pointer;
+  font-size: 11px; /* Reduced font size */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2); /* Reduced shadow */
+  text-transform: uppercase;
+  letter-spacing: 0.1px; /* Reduced letter spacing */
   color: #fff;
 }
 
-/* Стили для кнопки "Выйти" внутри меню */
-.map-menu-item.map-logout {
-  color: #fff; /* Белый текст */
-  background-color: #e74c3c; /* Насыщенный красный */
-  margin-top: 15px; /* Отступ от предыдущих элементов */
-  padding: 12px 15px; /* Увеличенный padding */
-  border-radius: 8px; /* Более скругленные углы */
+.polygon-action-button:disabled {
+  background: rgba(100, 100, 100, 0.5) !important;
+  color: #aaa !important;
+  cursor: not-allowed !important;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.polygon-action-button.delete {
+  background: linear-gradient(45deg, #e74c3c, #c0392b); /* Red gradient */
+}
+.polygon-action-button.delete:hover {
+  background: linear-gradient(45deg, #c0392b, #e74c3c);
+  transform: translateY(-1px);
+}
+
+.polygon-action-button.edit-form {
+  background: linear-gradient(45deg, #ffc107, #e0a800);
+  color: #333; /* Darker text for this button */
+}
+.polygon-action-button.edit-form:hover {
+  background: linear-gradient(45deg, #e0a800, #ffc107);
+  transform: translateY(-1px);
+}
+
+.polygon-action-button.save-polygon {
+  background: linear-gradient(45deg, #28a745, #218838);
+}
+.polygon-action-button.save-polygon:hover {
+  background: linear-gradient(45deg, #218838, #28a745);
+  transform: translateY(-1px);
+}
+
+.polygon-details-info {
+  font-size: 12px; /* Reduced font size */
+  color: var(--medium-text-color); /* Medium grey text */
+  margin-bottom: 6px; /* Reduced margin */
+}
+
+.polygon-details-row {
+  display: flex;
+  gap: 10px; /* Reduced gap */
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.polygon-color-box {
+  width: 18px; /* Reduced size */
+  height: 18px;
+  border-radius: 4px; /* Reduced border-radius */
+  border: 1px solid rgba(100, 100, 100, 0.6);
+  box-shadow: inset 0 0 2px rgba(0,0,0,0.2);
+}
+
+/* Crop and Comment Section for Selected Polygon */
+.polygon-meta-edit {
+  margin-top: 10px; /* Reduced margin */
+  padding-top: 10px;
+  border-top: 1px dashed rgba(100, 100, 100, 0.4); /* Dashed separator */
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Reduced gap */
+}
+
+.polygon-meta-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.polygon-detail-label {
+  display: block;
+  margin-bottom: 4px; /* Reduced margin */
+  font-size: 12px; /* Reduced font size */
+  color: var(--medium-text-color);
+  font-weight: 600;
+}
+
+.polygon-crop-select,
+.polygon-comment-input {
+  padding: 6px 8px; /* Reduced padding */
+  border: 1px solid rgba(100, 100, 100, 0.6);
+  border-radius: 6px; /* Reduced border-radius */
+  background-color: rgba(50, 50, 50, 0.7); /* Darker input background */
+  font-size: 12px; /* Reduced font size */
+  cursor: pointer;
+  flex: 1;
+  min-width: 120px; /* Reduced min-width */
+  color: var(--light-text-color);
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.polygon-crop-select:focus,
+.polygon-comment-input:focus {
+  outline: none;
+  border-color: var(--accent-orange-light);
+  box-shadow: 0 0 0 2px rgba(255, 150, 0, 0.3);
+}
+
+.polygon-crop-select:disabled,
+.polygon-comment-input:disabled {
+  background-color: rgba(80, 80, 80, 0.7);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+/* Display for unselected polygon crop/comment */
+.polygon-summary-display {
+  font-size: 12px; /* Reduced font size */
+  color: #90ee90; /* Lighter green for visibility on dark background */
   font-weight: bold;
-  text-align: center; /* Центрируем текст внутри кнопки */
-  box-shadow: 0 4px 10px rgba(231, 76, 60, 0.4); /* Тень для кнопки выхода */
+  background-color: rgba(46, 125, 50, 0.3); /* Transparent green background */
+  padding: 6px 8px; /* Reduced padding */
+  border-radius: 6px; /* Reduced border-radius */
+  margin-top: 6px; /* Reduced margin */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(46, 125, 50, 0.5);
+}
+
+/* Crops Summary Section */
+.crops-summary-section {
+  background: linear-gradient(145deg, rgba(17, 17, 17, 0.8) 0%, rgba(10, 10, 10, 0.8) 100%);
+  border: 1px solid var(--dark-border-color);
+  border-radius: 10px; /* Reduced border-radius */
+  overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.3); /* Reduced shadow */
+  margin-top: 15px; /* Reduced margin */
+  backdrop-filter: blur(8px);
+  flex-shrink: 0; /* Prevent it from shrinking */
+}
+
+.crops-summary-header {
+  background: linear-gradient(90deg, rgba(200, 80, 0, 0.4), rgba(255, 120, 30, 0.3)); /* Orange gradient header */
+  padding: 10px; /* Reduced padding */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.crops-summary-title {
+  margin: 0;
+  color: white;
+  font-size: 16px; /* Reduced font size */
+  font-weight: 700;
+}
+
+.crops-summary-actions {
+  display: flex;
+  gap: 6px; /* Reduced gap */
+}
+
+.crops-summary-button {
+  padding: 6px 9px; /* Reduced padding */
+  background-color: rgba(255, 255, 255, 0.1); /* More transparent white */
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px; /* Reduced border-radius */
+  cursor: pointer;
+  font-size: 11px; /* Reduced font size */
+  transition: all 0.2s ease;
+  backdrop-filter: blur(5px);
+}
+.crops-summary-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+.crops-summary-button.clear-crops {
+  background-color: rgba(231, 76, 60, 0.5); /* Red with transparency */
+  border-color: rgba(231, 76, 60, 0.6);
+}
+.crops-summary-button.clear-crops:hover {
+  background-color: rgba(231, 76, 60, 0.7);
+}
+.crops-summary-button:disabled {
+  background-color: rgba(100, 100, 100, 0.4) !important;
+  color: #aaa !important;
+  cursor: not-allowed !important;
+  border-color: rgba(100, 100, 100, 0.5) !important;
+}
+
+.crops-error-message {
+  padding: 6px 10px; /* Reduced padding */
+  background-color: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+  font-size: 10px; /* Reduced font size */
+  border-left: 3px solid #e74c3c; /* Thinner border */
+  font-weight: 500;
+}
+
+.crops-summary-content {
+  padding: 10px; /* Reduced padding */
+  background-color: rgba(26, 26, 26, 0.6); /* Slightly more opaque dark background */
+  border-radius: 0 0 10px 10px;
+  font-size: 11px; /* Reduced font size */
+  color: var(--light-text-color);
+}
+
+.crops-summary-details > div {
+  margin-bottom: 6px; /* Reduced margin */
+  font-weight: 500;
+}
+
+.crops-by-type {
+  margin-top: 10px; /* Reduced margin */
+  padding-top: 10px;
+  border-top: 1px dashed rgba(100, 100, 100, 0.4);
+}
+
+.crops-by-type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px; /* Reduced gap */
+}
+
+.crop-tag {
+  padding: 3px 6px; /* Reduced padding */
+  background-color: rgba(46, 125, 50, 0.3);
+  border-radius: 5px; /* Reduced border-radius */
+  font-size: 10px; /* Reduced font size */
+  color: #90ee90;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  border: 1px solid rgba(46, 125, 50, 0.5);
+}
+
+/* Burger Menu Icon - EarthData style */
+.burger-menu-icon {
+  position: absolute;
+  top: 10px; /* Reduced top position */
+  right: 10px; /* Reduced right position */
+  font-size: 24px; /* Reduced font size */
+  color: #fa7;
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.9) 0%, rgba(17, 17, 17, 0.9) 100%);
+  backdrop-filter: blur(10px);
+  padding: 8px 12px; /* Reduced padding */
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3); /* Reduced shadow */
+  cursor: pointer;
+  z-index: 1001;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(51, 51, 51, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.burger-menu-icon:hover {
+  transform: translateY(-1px) scale(1.03); /* Reduced hover effect */
+  box-shadow: 0 6px 15px rgba(255, 100, 0, 0.2);
+  border-color: var(--accent-orange-dark);
+  color: #fff;
+}
+
+.burger-menu-icon:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Dropdown Menu - EarthData style */
+.map-sidebar-dropdown-menu {
+  position: absolute;
+  top: 60px; /* Reduced top position */
+  right: 10px; /* Reduced right position */
+  background: linear-gradient(145deg, rgba(17, 17, 17, 0.95) 0%, rgba(10, 10, 10, 0.95) 100%);
+  backdrop-filter: blur(12px);
+  color: white;
+  border-radius: 10px; /* Reduced border-radius */
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6); /* Reduced shadow */
+  padding: 15px; /* Reduced padding */
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px; /* Reduced min-width */
+  height: auto;
+  max-height: calc(100vh - 70px); /* Adjusted max-height */
+  overflow-y: auto;
+  transform-origin: top right;
+  animation: fadeInScale 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; /* Reduced animation duration */
+  border: 1px solid rgba(51, 51, 51, 0.8);
+}
+
+/* Dropdown Menu Items */
+.map-menu-item {
+  background: none;
+  border: none;
+  color: var(--light-text-color);
+  text-align: left;
+  padding: 10px 15px; /* Reduced padding */
+  font-size: 14px; /* Reduced font size */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  border-radius: 6px; /* Reduced border-radius */
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Reduced gap */
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 6px; /* Reduced margin */
+  font-weight: 500;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.1); /* Reduced text shadow */
+}
+
+.map-menu-item:last-child {
+  margin-bottom: 0;
+}
+
+.map-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.08); /* Reduced transparency */
+  transform: translateX(3px); /* Reduced slide */
+  color: var(--accent-orange-light);
+  box-shadow: inset 0 0 8px rgba(255, 150, 0, 0.1);
+}
+
+.map-menu-item.active {
+  background: rgba(255, 120, 30, 0.15); /* Reduced transparency */
+  font-weight: bold;
+  box-shadow: inset 0 0 8px rgba(255, 120, 30, 0.3);
+  color: var(--accent-orange-light);
+  border: 1px solid var(--accent-orange-dark);
+  transform: translateX(0);
+}
+
+/* Logout Button in Dropdown */
+.map-menu-item.map-logout {
+  color: #fff;
+  background: linear-gradient(45deg, #e74c3c, #c0392b);
+  margin-top: 15px; /* Reduced margin */
+  padding: 10px 15px; /* Reduced padding */
+  border-radius: 8px; /* Reduced border-radius */
+  font-weight: bold;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(231, 76, 60, 0.5); /* Reduced shadow */
+  justify-content: center;
 }
 
 .map-menu-item.map-logout:hover {
-  background-color: #c0392b; /* Темнее при наведении */
-  transform: translateY(-2px); /* Легкий подъем */
-  box-shadow: 0 6px 15px rgba(231, 76, 60, 0.6); /* Усиленная тень */
+  background: linear-gradient(45deg, #c0392b, #e74c3c);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(231, 76, 60, 0.7);
 }
 
-/* Анимация появления/исчезновения меню */
+/* Animations */
 @keyframes fadeInScale {
   from {
     opacity: 0;
-    transform: scale(0.9) translateY(-10px); /* Начинаем чуть выше и меньше */
+    transform: scale(0.95) translateY(-5px); /* Reduced scale and translate */
   }
   to {
     opacity: 1;
@@ -118,28 +642,134 @@
   }
 }
 
-/* Медиа-запросы для адаптивности */
+/* Media Queries for Responsiveness */
 @media (max-width: 768px) {
+  .map-sidebar-container {
+    width: 100%;
+    min-width: unset;
+    max-width: 100%;
+    height: auto;
+    max-height: 50vh; /* Adjusted max-height */
+    border-left: none;
+    border-bottom: 1px solid var(--dark-border-color);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3); /* Reduced shadow */
+    padding: 10px; /* Reduced padding */
+  }
+
   .burger-menu-icon {
-    font-size: 20px;
-    padding: 6px 10px;
-    top: 10px;
-    right: 10px;
+    font-size: 22px;
+    padding: 8px 12px;
+    top: 8px;
+    right: 8px;
   }
 
   .map-sidebar-dropdown-menu {
     top: 50px;
-    right: 10px;
+    right: 8px;
     min-width: 160px;
-    padding: 10px;
+    padding: 12px;
+    max-height: calc(100vh - 60px);
   }
 
   .map-menu-item {
-    font-size: 14px;
-    padding: 10px 12px;
+    font-size: 13px;
+    padding: 8px 12px;
   }
 
   .map-menu-item.map-logout {
-    padding: 10px 12px;
+    padding: 8px 12px;
+  }
+
+  .map-sidebar-section-title {
+    font-size: 18px;
+  }
+
+  .map-sidebar-button {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .polygon-list-header, .crops-summary-title {
+    font-size: 15px;
+  }
+
+  .polygon-item {
+    padding: 8px;
+  }
+
+  .polygon-name-input, .polygon-crop-select, .polygon-comment-input {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  .polygon-action-button {
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+
+  .crops-summary-content {
+    padding: 8px;
+  }
+
+  .crop-tag {
+    font-size: 9px;
+    padding: 2px 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .map-sidebar-container {
+    padding: 8px;
+    gap: 10px;
+  }
+
+  .burger-menu-icon {
+    font-size: 16px;
+    padding: 5px 8px;
+    top: 6px;
+    right: 6px;
+  }
+
+  .map-sidebar-dropdown-menu {
+    top: 40px;
+    right: 6px;
+    min-width: 140px;
+    padding: 10px;
+  }
+
+  .map-sidebar-section-title {
+    font-size: 16px;
+  }
+
+  .map-sidebar-button {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  .polygon-list-header, .crops-summary-title {
+    font-size: 14px;
+  }
+
+  .polygon-item {
+    padding: 6px;
+  }
+
+  .polygon-name-input, .polygon-crop-select, .polygon-comment-input {
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+
+  .polygon-action-button {
+    font-size: 9px;
+    padding: 3px 5px;
+  }
+
+  .crops-summary-content {
+    padding: 6px;
+  }
+
+  .crop-tag {
+    font-size: 8px;
+    padding: 1px 4px;
   }
 }
