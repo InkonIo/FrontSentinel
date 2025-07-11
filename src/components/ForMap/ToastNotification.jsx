@@ -2,19 +2,9 @@
 import React, { useEffect, useState } from 'react';
 
 const ToastNotification = ({ message, type, visible }) => {
-  const [shouldRender, setShouldRender] = useState(visible);
-
-  useEffect(() => {
-    if (visible) {
-      setShouldRender(true);
-    } else {
-      // Даем немного времени для анимации исчезновения перед удалением из DOM
-      const timer = setTimeout(() => setShouldRender(false), 500); 
-      return () => clearTimeout(timer);
-    }
-  }, [visible]);
-
-  if (!shouldRender) return null;
+  // shouldRender теперь просто следует за 'visible'.
+  // Анимация исчезновения будет обрабатываться CSS-переходом.
+  if (!visible) return null; // Если 'visible' false, компонент не рендерится
 
   const getBackgroundColor = (type) => {
     switch (type) {
@@ -35,21 +25,22 @@ const ToastNotification = ({ message, type, visible }) => {
 
   const toastStyle = {
     position: 'fixed',
-    top: '20px',
-    right: '20px',
+    top: '20px', // Теперь сверху, с отступом 20px
+    left: '50%', // Центрируем по горизонтали
+    transform: 'translateX(-50%)', // Смещаем на половину своей ширины для точного горизонтального центрирования
     backgroundColor: getBackgroundColor(type),
     color: textColor,
-    padding: '12px 20px',
-    borderRadius: '8px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+    padding: '18px 30px', // Увеличиваем отступы
+    borderRadius: '12px', // Немного более округлые углы
+    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.4)', // Увеличиваем тень для выделения
     zIndex: 10000,
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'translateY(0)' : 'translateY(-20px)',
-    transition: 'opacity 0.5s ease-out, transform 0.5s ease-out',
-    maxWidth: '300px',
+    opacity: visible ? 1 : 0, // Управляется пропом 'visible'
+    transition: 'opacity 0.5s ease-out, transform 0.5s ease-out', // Плавный переход
+    maxWidth: '350px', // Увеличиваем максимальную ширину
     wordWrap: 'break-word',
     textAlign: 'center',
-    fontSize: '14px',
+    fontSize: '16px', // Увеличиваем размер шрифта
+    fontWeight: 'bold', // Делаем текст жирнее
   };
 
   return (

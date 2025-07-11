@@ -9,10 +9,10 @@ import * as L from 'leaflet';              // Импортируем библи�
 import './Map.css';                        // CSS-файл для специфичных стилей карты (если нужен)
 
 // >>> ВАЖНО: УСТАНОВИТЕ ВАШ БАЗОВЫЙ URL БЭКЕНДА ЗДЕСЬ! <<<
-// Он должен быть ТОЛЬКО корнем вашего домена/приложения, без '/api' или '/polygons'.
+// Он должен быть ТОЛЬКО корнем вашего вашего домена/приложения, без '/api' или '/polygons'.
 // Например: 'http://localhost:8080' для локальной разработки, или
 // 'https://newback-production-aa83.up.railway.app' для вашего Railway App.
-const BASE_API_URL = 'https://newback-production-aa83.up.railway.app'; 
+const BASE_API_URL = 'http://localhost:8080'; 
 
 // --- Вспомогательная функция для безопасного парсинга тела ответа ---
 async function parseResponseBody(response) {
@@ -72,6 +72,9 @@ export default function PolygonDrawMap({ handleLogout }) {
 
   // Состояние для тост-уведомлений
   const [toast, setToast] = useState({ message: '', type: '', visible: false });
+  // Состояние для отслеживания количества нарисованных точек (для пошаговых подсказок)
+  const [drawnPointsCount, setDrawnPointsCount] = useState(0);
+
   // Состояния для индикаторов загрузки/сохранения на БЭКЕНДЕ
   const [isSavingPolygon, setIsSavingPolygon] = useState(false);
   const [isFetchingPolygons, setIsFetchingPolygons] = useState(false);
@@ -93,40 +96,35 @@ export default function PolygonDrawMap({ handleLogout }) {
     return () => clearTimeout(timer); // Очистка таймера
   }, []);
 
-  // --- Функции для расчета и форматирования площади ---
   const calculateArea = useCallback((coordinates) => {
-    if (coordinates.length < 3) return 0; 
-    const toRadians = (deg) => (deg * Math.PI) / 180;
-    const R = 6371000; 
-    let area = 0;
-    const n = coordinates.length;
+  if (coordinates.length < 3) return 0;
 
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n; 
-      const lat1 = toRadians(coordinates[i][0]);
-      const lat2 = toRadians(coordinates[j][0]);
-      const deltaLon = toRadians(coordinates[j][1] - coordinates[i][1]);
+  const R = 6378137; // Радиус Земли в метрах
+  let area = 0;
 
-      const E =
-        2 *
-        Math.asin(
-          Math.sqrt(
-            Math.pow(Math.sin((lat2 - lat1) / 2), 2) +
-            Math.cos(lat1) *
-            Math.cos(lat2) *
-            Math.pow(Math.sin(deltaLon / 2), 2)
-          )
-        );
-      area += E * R * R;
-    }
-    return Math.abs(area) / 2;
-  }, []);
+  for (let i = 0, len = coordinates.length; i < len; i++) {
+    const [lat1, lon1] = coordinates[i];
+    const [lat2, lon2] = coordinates[(i + 1) % len];
+
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const dLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+    area += dLambda * (2 + Math.sin(phi1) + Math.sin(phi2));
+  }
+
+  area = (area * R * R) / 2.0;
+  return Math.abs(area); // в м²
+}, []);
+
+
 
   const formatArea = useCallback((area) => {
-    if (area < 10000) return `${area.toFixed(1)} м²`; 
-    if (area < 1000000) return `${(area / 10000).toFixed(1)} га`; 
-    return `${(area / 1000000).toFixed(1)} км²`; 
-  }, []);
+  if (area < 10000) return `${area.toFixed(1)} м²`;
+  if (area < 1000000) return `${(area / 10000).toFixed(1)} га`;
+  return `${(area / 1000000).toFixed(1)} км²`;
+}, []);
+
 
   // --- Функция для загрузки списка культур из API (Wikipedia) ---
   const fetchCropsFromAPI = async () => {
@@ -186,8 +184,8 @@ export default function PolygonDrawMap({ handleLogout }) {
 
   // --- Функция сохранения/обновления полигона в БД ---
   const savePolygonToDatabase = useCallback(async (polygonData, isUpdate = false) => {
-    // Деструктурируем все поля, включая name, crop и comment
-    const { id, name, coordinates, crop, comment } = polygonData; // Убедитесь, что 'comment' также деструктурируется
+    // Деструктурируем все поля, включая name, crop, comment и color
+    const { id, name, coordinates, crop, comment, color } = polygonData; 
 
     if (!name || name.trim() === '') {
       showToast('Ошибка сохранения: название полигона не может быть пустым.', 'error');
@@ -224,14 +222,15 @@ export default function PolygonDrawMap({ handleLogout }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        // Теперь отправляем name, crop и comment как ОТДЕЛЬНЫЕ поля в теле запроса,
+        // Теперь отправляем name, crop, comment и color как ОТДЕЛЬНЫЕ поля в теле запроса,
         // а geoJson - только строковое представление геометрии.
         body: JSON.stringify({ 
           id: isUpdate ? id : undefined, 
           geoJson: geoJsonString, // Отправляем только GeoJSON Geometry
           name: name,             // Отдельное поле для имени
           crop: crop || null,     // Отдельное поле для культуры (если нет, отправляем null)
-          comment: comment || null // Отдельное поле для комментария (если нет, отправляем null)
+          comment: comment || null, // Отдельное поле для комментария (если нет, отправляем null)
+          color: color || '#0000FF' // Отдельное поле для цвета (по умолчанию синий, если не задан)
         }),
       });
 
@@ -284,8 +283,37 @@ export default function PolygonDrawMap({ handleLogout }) {
     setIsEditingMode(false);
     setEditingMapPolygon(null); 
     editableFGRef.current?.clearLayers(); // Очищаем временный слой редактирования
-    showToast('Режим рисования активирован. Кликайте для добавления точек.', 'info');
+    setDrawnPointsCount(0); // Сбрасываем счетчик точек при начале нового рисования
+    // Показываем первый тост с инструкциями для первого клика
+    showToast(
+      '📍 Режим рисования активен. На карте выберите свое поле и поставьте первую точку.', 
+      'info'
+    );
   };
+
+  // Callback, который MapComponent должен вызывать при каждом добавлении точки
+  const handlePointAdded = useCallback(() => {
+    setDrawnPointsCount(prevCount => {
+      const newCount = prevCount + 1;
+      console.log(`PolygonDrawMap: handlePointAdded called. New count: ${newCount}`);
+      return newCount;
+    });
+  }, []);
+
+  // Эффект для отображения тостеров в зависимости от количества нарисованных точек
+  useEffect(() => {
+    console.log(`PolygonDrawMap: useEffect for toasts. isDrawing: ${isDrawing}, drawnPointsCount: ${drawnPointsCount}`);
+    if (isDrawing) {
+      if (drawnPointsCount === 1) {
+        console.log('PolygonDrawMap: Showing toast for 1 point.');
+        showToast('Отлично! Теперь добавьте еще точки. Для создания полигона необходимо минимум 3 точки.', 'info');
+      } else if (drawnPointsCount >= 3) {
+        console.log('PolygonDrawMap: Showing toast for >= 3 points.');
+        showToast('Вы нарисовали достаточно точек. Двойной клик на карте завершит рисование полигона.', 'info');
+      }
+    }
+  }, [drawnPointsCount, isDrawing, showToast]);
+
 
   // Остановить режим рисования (без сохранения)
   const stopDrawing = () => {
@@ -302,10 +330,13 @@ export default function PolygonDrawMap({ handleLogout }) {
     // Замыкаем кольцо сразу после получения координат от DrawingHandler
     const closedCoordinates = ensurePolygonClosed(coordinates);
 
+    // Генерируем случайный цвет в формате HEX для нового полигона
+    const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+
     const newPolygon = {
       id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, // Временный ID
       coordinates: closedCoordinates, // Используем уже замкнутые координаты
-      color: `hsl(${Math.random() * 360}, 70%, 50%)`, 
+      color: randomColor, // Присваиваем случайный цвет
       crop: null, 
       name: `Новый полигон ${new Date().toLocaleString()}`,
       comment: null // Инициализируем комментарий
@@ -315,12 +346,25 @@ export default function PolygonDrawMap({ handleLogout }) {
     setPolygons((prev) => [...prev, newPolygon]); 
     
     setIsDrawing(false); 
+    setDrawnPointsCount(0); // Сбрасываем счетчик точек
     setSelectedPolygon(newPolygon.id); 
     showToast('Полигон нарисован и сохранен локально! Отправка на сервер...', 'info');
 
     // Автоматическое сохранение нового полигона в БД с именем по умолчанию
     savePolygonToDatabase(newPolygon); 
   }, [savePolygonToDatabase, showToast]);
+
+  // НОВАЯ ФУНКЦИЯ: Обновление цвета полигона (в локальном состоянии и затем в БД)
+  const updatePolygonColor = useCallback((polygonId, newColor) => {
+    console.log(`updatePolygonColor: Updating polygon ${polygonId} with color ${newColor}.`);
+    setPolygons((prev) => {
+      const updatedPolys = prev.map((p) =>
+        p.id === polygonId ? { ...p, color: newColor } : p
+      );
+      return updatedPolys;
+    });
+    // Сохранение в БД будет вызвано onBlur в MapSidebar
+  }, []);
 
   // Удалить полигон по ID из локального состояния и БД
   const deletePolygon = useCallback(async (id) => {
@@ -451,10 +495,8 @@ export default function PolygonDrawMap({ handleLogout }) {
   const clearAllCrops = useCallback(() => {
     console.log('clearAllCrops: Clearing all assigned crops.');
     // Обновляем локальное состояние (вызовет сохранение в localStorage).
-    setPolygons((prev) => prev.map((p) => ({ ...p, crop: null, comment: null }))); // Также очищаем комментарий
-    showToast('Все культуры и комментарии удалены с полигонов. Синхронизируйте с сервером вручную, если необходимо.', 'info');
-    // Если нужно синхронизировать это с БД, потребуется отправить PUT-запросы для каждого полигоны
-    // или добавить отдельный эндпоинт на бэкенде для массовой очистки культур.
+    setPolygons((prev) => prev.map((p) => ({ ...p, crop: null, comment: null, color: '#0000FF' }))); // Также очищаем комментарий и сбрасываем цвет на синий
+    showToast('Все культуры, комментарии и цвета полигонов сброшены. Синхронизируйте с сервером вручную, если необходимо.', 'info');
   }, [showToast]);
 
   // Обновить культуру для конкретного полигона (в локальном состоянии и затем в БД)
@@ -567,7 +609,11 @@ export default function PolygonDrawMap({ handleLogout }) {
     setIsEditingMode(true); 
     setEditingMapPolygon(polygonToEdit); // Передаем полигон для редактирования в MapComponent
     setSelectedPolygon(polygonToEdit.id); 
-    showToast(`Начато редактирование формы полигона "${polygonToEdit.name || polygonToEdit.id}".`, 'info');
+    // Показываем тост с инструкциями для редактирования
+    showToast(
+      `📍 Режим редактирования активен. Перемещайте вершины полигона, чтобы изменить его форму. Нажмите "Остановить и сохранить" в боковой панели, чтобы применить изменения.`, 
+      'info'
+    );
     console.log('[handleEditPolygon] isEditingMode set to TRUE. isSavingPolygon and isFetchingPolygons set to FALSE.');
     // Важно: Здесь мы БОЛЬШЕ НЕ добавляем слой в editableFGRef.current напрямую и не вызываем .enable() здесь.
     // Это будет сделано в useEffect в MapComponent, когда реф будет гарантированно доступен и компонент отрисуется.
@@ -580,7 +626,7 @@ export default function PolygonDrawMap({ handleLogout }) {
     if (isDrawing) {
       if (window.clearCurrentPath) window.clearCurrentPath(); 
       stopDrawing(); 
-      showToast('Рисование остановлено.', 'info');
+      showToast('Рисование остановлено.', 'info'); // Тост при остановке рисования
     } 
     // Если мы в режиме редактирования формы/карты, сохраняем изменения.
     else if (isEditingMode && editableFGRef.current) {
@@ -611,7 +657,7 @@ export default function PolygonDrawMap({ handleLogout }) {
       setIsEditingMode(false);
       setEditingMapPolygon(null); 
       editableFGRef.current?.clearLayers(); 
-      showToast('Редактирование завершено и сохранено.', 'success');
+      showToast('Редактирование завершено и сохранено.', 'success'); // Тост при завершении редактирования
     } else {
       showToast('Нет активных режимов для сохранения.', 'info');
     }
@@ -672,11 +718,12 @@ export default function PolygonDrawMap({ handleLogout }) {
         if (data && Array.isArray(data)) {
           const loadedPolygons = data.map(item => {
             let coordinates = [];
-            // Теперь name, crop и comment приходят как отдельные поля в item из PolygonAreaResponseDto
+            // Теперь name, crop, comment и color приходят как отдельные поля в item из PolygonAreaResponseDto
             let name = item.name || `Загруженный полигон ${item.id || String(Date.now())}`;
             let crop = item.crop || null;
             let comment = item.comment || null; // Извлекаем комментарий
-            
+            let color = item.color || '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'); // Извлекаем цвет, если нет - генерируем случайный
+
             try {
               const geoJsonObj = JSON.parse(item.geoJson); // item.geoJson теперь должен быть чистой геометрией
 
@@ -699,7 +746,7 @@ export default function PolygonDrawMap({ handleLogout }) {
             return {
               id: String(item.id), 
               coordinates: coordinates,
-              color: `hsl(${Math.random() * 360}, 70%, 50%)`, 
+              color: color, 
               crop: crop, 
               name: name,
               comment: comment // Передаем комментарий в объект полигона
@@ -735,8 +782,8 @@ export default function PolygonDrawMap({ handleLogout }) {
       if (storedPolygons !== null && storedPolygons !== '[]') { // Проверяем, что не null и не пустой массив
         const parsedPolygons = JSON.parse(storedPolygons);
         // Дополнительная валидация, чтобы убедиться, что данные выглядят как массив полигонов
-        // Теперь также проверяем наличие 'comment'
-        if (Array.isArray(parsedPolygons) && parsedPolygons.every(p => p && p.coordinates && Array.isArray(p.coordinates) && p.coordinates.length >= 3 && 'comment' in p)) {
+        // Теперь также проверяем наличие 'comment' и 'color'
+        if (Array.isArray(parsedPolygons) && parsedPolygons.every(p => p && p.coordinates && Array.isArray(p.coordinates) && p.coordinates.length >= 3 && 'comment' in p && 'color' in p)) {
           // Замыкаем кольцо для полигонов, загруженных из localStorage
           const closedPolygons = parsedPolygons.map(p => ({
             ...p,
@@ -795,6 +842,7 @@ export default function PolygonDrawMap({ handleLogout }) {
         analysisDateRange={analysisDateRange} // НОВЫЙ ПРОП: Передаем диапазон дат анализа
         onLoadingChange={handleAnalysisLoadingChange} // НОВЫЙ ПРОП: Передаем коллбэк для загрузки
         onError={handleAnalysisError} // НОВЫЙ ПРОП: Передаем коллбэк для ошибок
+        onPointAdded={handlePointAdded} // НОВЫЙ ПРОП: Передаем коллбэк для добавления точек
       />
 
       <MapSidebar
@@ -821,55 +869,12 @@ export default function PolygonDrawMap({ handleLogout }) {
         showMyPolygons={showMyPolygons} 
         updatePolygonName={updatePolygonName} 
         updatePolygonComment={updatePolygonComment}
+        updatePolygonColor={updatePolygonColor} // НОВЫЙ ПРОП: Передаем функцию обновления цвета
         isSavingPolygon={isSavingPolygon} 
         isFetchingPolygons={isFetchingPolygons} 
         showCropsSection={(polygons && polygons.length > 0) || isDrawing || isEditingMode || selectedPolygon} 
         savePolygonToDatabase={savePolygonToDatabase} 
       />
-
-      {(isDrawing || isEditingMode) && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '15px',
-            left: '15px',
-            backgroundColor: 'rgba(0,0,0,0.85)',
-            color: 'white',
-            padding: '15px',
-            borderRadius: '8px',
-            fontSize: '14px',
-            zIndex: 1000,
-            maxWidth: '320px',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-          }}
-        >
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#4CAF50' }}>
-            📍 Режим {isDrawing ? 'рисования' : 'редактирования'} активен
-          </div>
-          <div style={{ lineHeight: '1.4' }}>
-            {isDrawing && (
-              <>
-                <p>
-                  Кликайте на карту, чтобы добавлять точки.
-                  Двойной клик для завершения рисования полигона.
-                </p>
-                <p>
-                  Нажмите "Остановить и сохранить" в боковой панели,
-                  чтобы завершить и сохранить текущий полигон.
-                </p>
-              </>
-            )}
-            {isEditingMode && (
-              <>
-                <p>
-                  Перемещайте вершины полигона, чтобы изменить его форму.
-                  Нажмите "Остановить и сохранить" в боковой панели, чтобы применить изменения.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       <ToastNotification 
         message={toast.message} 

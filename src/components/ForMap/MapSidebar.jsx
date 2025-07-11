@@ -1,6 +1,6 @@
 // components/ForMap/MapSidebar.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom'; // Import Link for consistency
 import './MapSidebar.css'; // Import the updated CSS
 
 export default function MapSidebar({
@@ -27,19 +27,20 @@ export default function MapSidebar({
   showMyPolygons,
   updatePolygonName,
   updatePolygonComment,
+  updatePolygonColor, // НОВЫЙ ПРОП: для обновления цвета полигона
   isSavingPolygon,
   isFetchingPolygons,
   showCropsSection,
   savePolygonToDatabase,
 }) {
-
-  const [isBurgerMenuOpen, setIsBurgerMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState('map');
+  const [activeSection, setActiveSection] = useState('map'); // Start with 'map' as default for this component
   const [showPolygonsList, setShowPolygonsList] = useState(true);
+  // Removed isBurgerMenuOpen state as the burger menu is being removed
 
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Determine active section based on current path
   useEffect(() => {
     if (location.pathname === '/') setActiveSection('home');
     else if (location.pathname === '/dashboard') setActiveSection('map');
@@ -48,60 +49,13 @@ export default function MapSidebar({
     else setActiveSection('');
   }, [location.pathname]);
 
-  const handleNavigate = (path, section) => {
-    setIsBurgerMenuOpen(false);
-    setActiveSection(section);
-    navigate(path);
-  };
-
-  const toggleBurgerMenu = () => {
-    setIsBurgerMenuOpen(prev => !prev);
-  };
+  // Removed toggleBurgerMenu function as the burger menu is being removed
+  // Removed handleNavigate function as it was only used by the burger menu
 
   return (
+    // The main container for the map sidebar content
     <div className={`map-sidebar-container`}>
-      {/* Burger Menu Button */}
-      <button className="burger-menu-icon" onClick={toggleBurgerMenu} aria-label="Открыть/закрыть меню">
-        {isBurgerMenuOpen ? '✕' : '☰'}
-      </button>
-
-      {/* Dropdown Menu */}
-      {isBurgerMenuOpen && (
-        <div className="map-sidebar-dropdown-menu">
-          <a
-            href="#"
-            onClick={e => { e.preventDefault(); handleNavigate('/', 'home'); }}
-            className={`map-menu-item ${activeSection === 'home' ? 'active' : ''}`}
-          >
-            🏠 <span className="menu-item-text">Главная</span>
-          </a>
-          <a
-            href="#"
-            onClick={e => { e.preventDefault(); handleNavigate('/dashboard', 'map'); }}
-            className={`map-menu-item ${activeSection === 'map' ? 'active' : ''}`}
-          >
-            🗺️ <span className="menu-item-text">Карта</span>
-          </a>
-          <a
-            href="#"
-            onClick={e => { e.preventDefault(); handleNavigate('/chat', 'ai-chat'); }}
-            className={`map-menu-item ${activeSection === 'ai-chat' ? 'active' : ''}`}
-          >
-            🤖 <span className="menu-item-text">ИИ-чат</span>
-          </a>
-          <a
-            href="#"
-            onClick={e => { e.preventDefault(); handleNavigate('/earthdata', 'soil-data'); }}
-            className={`map-menu-item ${activeSection === 'soil-data' ? 'active' : ''}`}
-          >
-            🌱 <span className="menu-item-text">Данные почвы</span>
-          </a>
-
-          <button onClick={handleLogout} className="map-menu-item map-logout">
-            🚪 <span className="menu-item-text">Выйти</span>
-          </button>
-        </div>
-      )}
+      {/* Burger Menu Button and Dropdown Menu are removed */}
 
       {/* Wrapper for scrollable content */}
       <div className="map-sidebar-content-wrapper">
@@ -220,11 +174,39 @@ export default function MapSidebar({
                     <div className="polygon-details-row">
                       <span>Точек: {polygon.coordinates.length}</span>
                       <span>Площадь: {formatArea(calculateArea(polygon.coordinates))}</span>
+                      {/* Отображение цвета полигона */}
                       <div style={{ backgroundColor: polygon.color }} className="polygon-color-box"></div>
                     </div>
                   </div>
                   {selectedPolygon === polygon.id && (
                     <div className="polygon-meta-edit">
+                      {/* Выбор цвета полигона */}
+                      <div className="polygon-meta-group">
+                        <label htmlFor={`color-picker-${polygon.id}`} className="polygon-detail-label">
+                          Цвет полигона:
+                        </label>
+                        <input
+                          id={`color-picker-${polygon.id}`}
+                          type="color"
+                          value={polygon.color || '#000000'} // Значение по умолчанию, если цвет не установлен
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            updatePolygonColor(polygon.id, e.target.value);
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                            const originalPoly = polygons.find(p => p.id === polygon.id);
+                            if (originalPoly && originalPoly.color !== e.target.value) {
+                                const polyToSave = { ...originalPoly, color: e.target.value };
+                                savePolygonToDatabase(polyToSave, true);
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="polygon-color-input" // Новый класс для стилизации
+                          disabled={isSavingPolygon || isFetchingPolygons}
+                        />
+                      </div>
+
                       <div className="polygon-meta-group">
                         <label htmlFor={`crop-select-${polygon.id}`} className="polygon-detail-label">
                           Культура:

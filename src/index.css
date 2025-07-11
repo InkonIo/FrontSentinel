@@ -27,7 +27,9 @@ a:hover {
 
 body {
   margin: 0;
-  place-items: center;
+  padding: 0; /* Убедитесь, что padding body равен 0 */
+  overflow-x: hidden; /* Предотвращает горизонтальную прокрутку */
+  place-items: center; /* Это может конфликтовать с flexbox или grid в корневых компонентах, рассмотрите удаление, если есть проблемы с компоновкой */
   min-width: 320px;
   min-height: 100vh;
   background-color: #f0f0f0ce;
@@ -52,8 +54,6 @@ h1 {
   font-size: 3.2em;
   line-height: 1.1;
 }
-
-
 
 /* Кнопка в тёмной теме */
 body.dark-theme button {
@@ -259,6 +259,16 @@ button {
 #root {
   width: 100%;
 }
+
+/* Стили для контейнера, который оборачивает все маршруты, кроме заголовка */
+.main-content-wrapper {
+  padding-top: 50px; /* Отступ сверху, чтобы содержимое не перекрывалось заголовком.
+                         Отрегулируйте это значение, если высота вашего ProfileHeader изменится.
+                         Ваш ProfileHeader имеет height: 50px, поэтому 70px даст небольшой зазор. */
+  min-height: calc(100vh - 70px); /* Убедитесь, что контент занимает всю оставшуюся высоту */
+  box-sizing: border-box; /* Включает padding в общую высоту/ширину */
+}
+
 
 @media (prefers-color-scheme: light) {
   :root {

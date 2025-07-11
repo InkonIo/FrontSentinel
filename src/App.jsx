@@ -28,7 +28,8 @@ function AppContent() {
     setIsAuthenticated(false);
   };
 
-  const isDashboardPage = location.pathname === '/dashboard';
+  // Удаляем isDashboardPage, так как ProfileHeader будет всегда отображаться
+  // const isDashboardPage = location.pathname === '/dashboard';
 
   return (
     <>
@@ -36,27 +37,30 @@ function AppContent() {
         <RegistrationModal onSuccess={handleLoginSuccess} />
       ) : (
         <>
-          {/* ProfileHeader рендерится на всех страницах, кроме /dashboard */}
-          {!isDashboardPage && <ProfileHeader onLogout={handleLogout} />}
+          {/* ProfileHeader теперь рендерится на ВСЕХ страницах, без условий */}
+          <ProfileHeader onLogout={handleLogout} />
 
-          <Routes>
-            <Route path="/register" element={<RegistrationModal onSuccess={handleLoginSuccess} />} />
-            <Route path="/home" element={<Home />} />
-            
-            {/* На /dashboard, AppLayout оборачивает PolygonDrawMap и получает handleLogout */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <AppLayout handleLogout={handleLogout}>
-                  <PolygonDrawMap handleLogout={handleLogout} /> {/* Передаем handleLogout в PolygonDrawMap */}
-                </AppLayout>
-              } 
-            />
-            
-            <Route path="/earthdata" element={<EarthData />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/" element={<MainPage />} />
-          </Routes>
+          {/* Добавляем основной контейнер для контента, чтобы он не перекрывался заголовком */}
+          <div className="main-content-wrapper">
+            <Routes>
+              <Route path="/register" element={<RegistrationModal onSuccess={handleLoginSuccess} />} />
+              <Route path="/home" element={<Home />} />
+              
+              {/* AppLayout оборачивает PolygonDrawMap и получает handleLogout */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <AppLayout handleLogout={handleLogout}>
+                    <PolygonDrawMap handleLogout={handleLogout} /> {/* Передаем handleLogout в PolygonDrawMap */}
+                  </AppLayout>
+                } 
+              />
+              
+              <Route path="/earthdata" element={<EarthData />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/" element={<MainPage />} />
+            </Routes>
+          </div>
         </>
       )}
     </>

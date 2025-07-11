@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Polygon, useMapEvents } from 'react-leaflet';
 
 // Пользовательский компонент для рисования полигонов
-export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDrawing, setIsDrawing }) {
+export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDrawing, setIsDrawing, onPointAdded }) {
   const [currentPath, setCurrentPath] = useState([]); // Состояние для хранения текущих координат рисуемого полигона
   const [hoveredPoint, setHoveredPoint] = useState(null); // Точка, следующая за курсором, для визуализации линии
 
@@ -26,13 +26,23 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
   // Хук useMapEvents позволяет реагировать на события карты Leaflet
   useMapEvents({
     click: (e) => {
+      console.log('DrawingHandler: Click event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
       // Если режим рисования не активен, игнорируем клик
       if (!isDrawing) return;
 
       const newPoint = [e.latlng.lat, e.latlng.lng]; // Получаем координаты клика
-      setCurrentPath((prev) => [...prev, newPoint]); // Добавляем новую точку к текущему пути
+      setCurrentPath((prev) => {
+        const updatedPath = [...prev, newPoint];
+        // Вызываем onPointAdded каждый раз, когда добавляется новая точка
+        if (onPointAdded) {
+          console.log('DrawingHandler: Calling onPointAdded.');
+          onPointAdded();
+        }
+        return updatedPath;
+      });
     },
     dblclick: (e) => {
+      console.log('DrawingHandler: Double click event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
       // Если режим рисования не активен или точек меньше 3 (недостаточно для полигона), игнорируем двойной клик
       if (!isDrawing || currentPath.length < 3) return;
 
@@ -42,12 +52,14 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
       setIsDrawing(false); // Выключаем режим рисования
     },
     mousemove: (e) => {
+      console.log('DrawingHandler: Mousemove event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
       // Если режим рисования активен и есть хотя бы одна точка в пути, обновляем hoveredPoint
       if (isDrawing && currentPath.length > 0) {
         setHoveredPoint([e.latlng.lat, e.latlng.lng]);
       }
     },
     mouseout: () => {
+      console.log('DrawingHandler: Mouseout event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
       // Когда курсор покидает карту, очищаем hoveredPoint
       setHoveredPoint(null); 
     }

@@ -7,26 +7,50 @@
   background-color: #000;
   color: #fff;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  /* Добавляем отступ сверху, чтобы учесть ProfileHeader */
+  padding-top: 50px; /* Высота ProfileHeader + padding */
+  box-sizing: border-box; /* Учитываем padding в общей высоте */
+  /* Определяем переменную для ширины сайдбара по умолчанию, если JS еще не установил */
+  --sidebar-width: 220px; /* Начальное значение */
 }
 
 /* Боковая панель */
 .chat-sidebar {
-  width: 220px;
+  /* Используем CSS переменную для ширины */
+  width: var(--sidebar-width);
   background-color: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Изменено на flex-start, чтобы кнопки полигонов были сверху */
+  justify-content: flex-start;
   align-items: center;
   padding: 20px;
   box-sizing: border-box;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
-  height: 100vh;
+  height: 100%; /* Теперь 100% от chat-container, который уже имеет padding-top */
   overflow-y: auto;
-  transition: all 0.4s ease;
-  position: relative; /* Для позиционирования кнопки очистки */
-  padding-top: 80px; /* Добавлен отступ сверху, чтобы учесть навигационную шапку */
+  transition: all 0.4s ease; /* Добавлено для плавного перехода при изменении ширины */
+  position: relative; /* Для позиционирования ресайзера */
+  /* padding-top: 100px; Удаляем, так как padding-top теперь у .chat-container */
 }
+
+/* Элемент для изменения размера */
+.resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px; /* Ширина области для перетаскивания */
+  cursor: ew-resize; /* Курсор изменения размера по горизонтали */
+  background-color: rgba(255, 255, 255, 0.1); /* Небольшая видимость для ресайзера */
+  transition: background-color 0.2s ease;
+  z-index: 10; /* Убедитесь, что он поверх сайдбара */
+}
+
+.resizer:hover {
+  background-color: rgba(255, 255, 255, 0.3); /* Подсветка при наведении */
+}
+
 
 /* Заголовок боковой панели */
 .sidebar-title {
@@ -35,8 +59,8 @@
   font-size: 16px;
   color: #ffffff;
   margin-bottom: 25px;
-  text-align: center;
-  margin-top: -40px;
+  text-align: center; /* Центрирует текст заголовка */
+  margin-top: 0; /* Убираем отрицательный margin-top */
 }
 
 /* Контейнер кнопок полигонов */
@@ -44,7 +68,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: 100%;
+  width: 100%; /* Занимает всю доступную ширину родителя */
   padding: 0 10px;
   margin-bottom: auto; /* Отталкивает кнопку очистки вниз */
 }
@@ -60,7 +84,7 @@
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease;
   width: 100%;
-  text-align: left;
+  text-align: center; /* Центрирует текст внутри кнопки */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,7 +110,7 @@
 .no-polygons-message {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.7);
-  text-align: center;
+  text-align: center; /* Центрирует текст сообщения */
   padding: 10px;
 }
 
@@ -141,6 +165,8 @@
   transition: opacity 0.5s ease;
   color: rgba(255, 255, 255, 0.7);
   pointer-events: none; /* Чтобы не блокировать клики */
+  max-width: 80%; /* Ограничиваем ширину для лучшего центрирования текста */
+  box-sizing: border-box;
 }
 
 .chat-intro.hide {
@@ -168,12 +194,15 @@
 .messages {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 60px 20px 10px 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+  max-width: 100%; /* Убедитесь, что не выходит за пределы родителя */
+  margin: 0 auto; /* Центрирование содержимого, если оно не занимает всю ширину */
+  box-sizing: border-box;
 }
 
 .messages::-webkit-scrollbar {
@@ -217,6 +246,8 @@
   left: 0;
   right: 0;
   z-index: 10;
+  max-width: 100%; /* Убедитесь, что не выходит за пределы родителя */
+  margin: 0 auto; /* Центрирование содержимого, если оно не занимает всю ширину */
 }
 
 .input-area input {

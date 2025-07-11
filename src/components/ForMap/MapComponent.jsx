@@ -32,10 +32,11 @@ export default function MapComponent({
   isAnalysisLoading,
   onLoadingChange,
   onError,
-  analysisDateRange
+  analysisDateRange,
+  onPointAdded // Колбэк для уведомления о добавлении точки
 }) {
   const mapRef = useRef(null);
-  const [mapInstance, setMapInstance] = useState(null); // НОВОЕ СОСТОЯНИЕ для экземпляра карты
+  const [mapInstance, setMapInstance] = useState(null); // СОСТОЯНИЕ для экземпляра карты
   const [zoom, setZoom] = useState(13);
 
   const calculateArea = useCallback((coordinates) => {
@@ -102,12 +103,17 @@ export default function MapComponent({
     }
   }, [isEditingMode, editableFGRef, editingMapPolygon]);
 
+  // УДАЛЕН: useEffect для прослушивания событий DRAWVERTEX на mapInstance,
+  // так как теперь DrawingHandler будет напрямую вызывать onPointAdded.
+  // Это предотвращает дублирование и обеспечивает более надежный вызов.
+
   return (
     <MapContainer
       center={[43.2567, 76.9286]}
       zoom={13}
       style={{ height: '100%', flex: 1 }}
       ref={mapRef}
+      zoomControl={false}
       whenCreated={(mapInstance) => {
         mapRef.current = mapInstance;
         setMapInstance(mapInstance); // СОХРАНЯЕМ ЭКЗЕМПЛЯР КАРТЫ В СОСТОЯНИЕ
@@ -131,7 +137,7 @@ export default function MapComponent({
 
       <WMSTileLayer
         url="https://services.sentinel-hub.com/ogc/wms/5b29f7b4-15d8-44b1-b89e-345252847af1" // Ваш Instance ID
-        layers="1_TRUE_COLOR" // Стандартное название слоя для True Color Sentinel-2 L2A
+        layers="2_TONEMAPPED_NATURAL_COLOR" // Стандартное название слоя для True Color Sentinel-2 L2A
         format="image/png"
         transparent={true}
         version="1.3.0"
@@ -142,6 +148,7 @@ export default function MapComponent({
         onStopAndSave={stopAndSaveDrawingFromMap}
         isDrawing={isDrawing}
         setIsDrawing={setIsDrawing}
+        onPointAdded={onPointAdded} // <-- ТЕПЕРЬ ПЕРЕДАЕМ onPointAdded В DrawingHandler
       />
 
       {isEditingMode && (

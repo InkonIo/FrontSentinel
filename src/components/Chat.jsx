@@ -6,7 +6,7 @@ import './Chat.css';
 const MAX_MESSAGES_IN_HISTORY = 20; // Можно настроить это значение
 
 // Новый базовый URL для вашего развернутого бэкенда
-const BASE_API_URL = 'https://newback-production-aa83.up.railway.app';
+const BASE_API_URL = 'http://localhost:8080';
 
 export default function ChatPage() {
   const [message, setMessage] = useState("");
@@ -27,6 +27,37 @@ export default function ChatPage() {
   useEffect(() => {
     chatHistoriesRef.current = chatHistories;
   }, [chatHistories]);
+
+  const sidebarRef = useRef(null);
+  const isResizingRef = useRef(false);
+
+  useEffect(() => {
+  const savedWidth = localStorage.getItem('chatSidebarWidth');
+  if (savedWidth && sidebarRef.current) {
+    sidebarRef.current.style.width = `${savedWidth}px`;
+    document.documentElement.style.setProperty('--sidebar-width', `${savedWidth}px`);
+  }
+
+  const handleMouseMove = (e) => {
+    if (!isResizingRef.current || !sidebarRef.current) return;
+    const newWidth = Math.max(200, Math.min(e.clientX, 500));
+    sidebarRef.current.style.width = `${newWidth}px`;
+    localStorage.setItem('chatSidebarWidth', newWidth);
+    document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+  };
+
+  const handleMouseUp = () => {
+    isResizingRef.current = false;
+    document.body.style.cursor = 'default';
+  };
+
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+  return () => {
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+}, []);
 
   // Функция для отправки сообщения на бэкенд
   const sendMessageToBackend = useCallback(async (textToSend, polygonId, isInitialPrompt = false) => {
@@ -389,39 +420,50 @@ export default function ChatPage() {
 
   return (
     <div className="chat-container">
-      <div className="chat-sidebar">
-        <h3 className="sidebar-title">Мои Полигоны</h3>
-        <div className="polygon-buttons-container">
-          {userPolygons.length > 0 ? (
-            userPolygons.map((polygon) => (
-              <button
-                key={polygon.id}
-                className={`polygon-button ${selectedPolygonId === polygon.id ? 'selected' : ''}`} 
-                onClick={() => handlePolygonClick(polygon)} 
-                disabled={!isLoggedIn} 
-              >
-                {polygon.name} ({polygon.crop})
-              </button>
-            ))
-          ) : (
-            isLoggedIn ? (
-              <p className="no-polygons-message">У вас пока нет сохраненных полигонов.</p>
-            ) : (
-              <p className="no-polygons-message">Загрузка полигонов...</p>
-            )
-          )}
-        </div>
-        {/* Кнопка "Очистить историю" перенесена вниз сайдбара */}
-        {selectedPolygonId && isLoggedIn && (
-          <button 
-            className="clear-history-button" 
-            onClick={handleClearHistory}
-            disabled={isTyping}
-          >
-            Очистить историю
-          </button>
-        )}
-      </div>
+      <div className="chat-sidebar" ref={sidebarRef}>
+  <h3 className="sidebar-title">Мои Полигоны</h3>
+
+  <div className="polygon-buttons-container">
+    {userPolygons.length > 0 ? (
+      userPolygons.map((polygon) => (
+        <button
+          key={polygon.id}
+          className={`polygon-button ${selectedPolygonId === polygon.id ? 'selected' : ''}`} 
+          onClick={() => handlePolygonClick(polygon)} 
+          disabled={!isLoggedIn} 
+        >
+          {polygon.name} ({polygon.crop})
+        </button>
+      ))
+    ) : (
+      isLoggedIn ? (
+        <p className="no-polygons-message">У вас пока нет сохраненных полигонов.</p>
+      ) : (
+        <p className="no-polygons-message">Загрузка полигонов...</p>
+      )
+    )}
+  </div>
+
+  {selectedPolygonId && isLoggedIn && (
+    <button 
+      className="clear-history-button" 
+      onClick={handleClearHistory}
+      disabled={isTyping}
+    >
+      Очистить историю
+    </button>
+  )}
+
+  {/* 👉 Добавляем полосу для изменения ширины */}
+  <div
+    className="resizer"
+    onMouseDown={() => {
+      isResizingRef.current = true;
+      document.body.style.cursor = 'ew-resize';
+    }}
+  ></div>
+</div>
+
 
       <div className="chat-main">
         <div className={`chat-intro ${hideIntro ? 'hide' : ''}`}>

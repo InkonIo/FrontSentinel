@@ -3,7 +3,7 @@
 body {
   margin: 0;
   padding: 0;
-  background: #000;
+  background: #1a1a1a; /* Основной фон, который будет просвечивать */
 }
 
 /* Header */
@@ -12,7 +12,13 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 15px 30px;
-  background: transparent;
+  /* Фон, взятый из MapSidebar, с эффектом "жидкого стекла" */
+  background: linear-gradient(145deg, rgba(17, 17, 17, 0.9) 0%, rgba(10, 10, 10, 0.9) 100%) !important; /* Добавлен !important для принудительного применения */
+  backdrop-filter: blur(25px) saturate(150%); /* Умеренное размытие и насыщенность */
+  -webkit-backdrop-filter: blur(25px) saturate(150%); /* Для совместимости с Safari */
+  border-bottom: 1px solid rgba(51, 51, 51, 0.6); /* Темная граница снизу, как у сайдбара */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* Мягкая тень */
+
   font-family: 'Inter', sans-serif;
   height: 50px;
   position: fixed;
@@ -49,7 +55,7 @@ body {
 }
 
 .profile-header-nav-link {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.85); /* Цвет текста для темной темы */
   text-decoration: none;
   font-weight: 400;
   font-size: 13px;
@@ -150,11 +156,11 @@ body {
   cursor: pointer;
   font-size: 0.95rem;
   color: #333;
-  transition: transparent;
+  transition: background-color 0.2s ease;
 }
 
 .settings-dropdown button:hover {
-  background: transparent;
+  background: #f0f0f0;
 }
 
 /* Мобильная адаптация */
@@ -228,9 +234,28 @@ body {
   }
 }
 
+/* Адаптация для светлой темы */
 @media (prefers-color-scheme: light) {
   .profile-header {
-    background: transparent !important;
+    /* Для светлой темы также используем темный градиент, чтобы сохранить консистентность */
+    background: linear-gradient(145deg, rgba(17, 17, 17, 0.9) 0%, rgba(10, 10, 10, 0.9) 100%) !important;
+    backdrop-filter: blur(25px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(150%) !important;
+    border-bottom: 1px solid rgba(51, 51, 51, 0.6) !important; /* Темная граница */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  }
+  .profile-header-nav-link {
+    color: rgba(255, 255, 255, 0.85); /* Цвет текста для темной темы */
+  }
+  .profile-header-nav-link:hover {
+    color: #FF8C42; /* Акцентный цвет остается */
+  }
+  .profile-header-nav-link.active {
+    color: #FF8C42;
+    text-shadow: 0 0 10px rgba(255, 140, 66, 0.4);
+  }
+  .profile-header-button {
+    color: rgba(255, 255, 255, 0.8);
   }
 }
 
