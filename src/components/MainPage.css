@@ -1,7 +1,7 @@
 /* General Styles */
 * {
   margin: 0;
-  padding: 0;
+  padding-top: 0px;
   box-sizing: border-box;
 }
 
@@ -16,6 +16,7 @@ body {
   position: relative;
   overflow: hidden;
   display: flex;
+  padding-top: 30px
 }
 
 /* Background */

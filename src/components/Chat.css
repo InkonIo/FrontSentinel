@@ -8,7 +8,7 @@
   color: #fff;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   /* Добавляем отступ сверху, чтобы учесть ProfileHeader */
-  padding-top: 50px; /* Высота ProfileHeader + padding */
+  padding-top: 30px; /* Высота ProfileHeader + padding */
   box-sizing: border-box; /* Учитываем padding в общей высоте */
   /* Определяем переменную для ширины сайдбара по умолчанию, если JS еще не установил */
   --sidebar-width: 220px; /* Начальное значение */
@@ -29,9 +29,8 @@
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   height: 100%; /* Теперь 100% от chat-container, который уже имеет padding-top */
   overflow-y: auto;
-  transition: all 0.4s ease; /* Добавлено для плавного перехода при изменении ширины */
+  /* transition: all 0.4s ease; */ /* <--- УДАЛЕНО: Убираем плавность */
   position: relative; /* Для позиционирования ресайзера */
-  /* padding-top: 100px; Удаляем, так как padding-top теперь у .chat-container */
 }
 
 /* Элемент для изменения размера */
@@ -43,7 +42,7 @@
   width: 8px; /* Ширина области для перетаскивания */
   cursor: ew-resize; /* Курсор изменения размера по горизонтали */
   background-color: rgba(255, 255, 255, 0.1); /* Небольшая видимость для ресайзера */
-  transition: background-color 0.2s ease;
+  /* transition: background-color 0.2s ease; */ /* <--- УДАЛЕНО: Убираем плавность */
   z-index: 10; /* Убедитесь, что он поверх сайдбара */
 }
 

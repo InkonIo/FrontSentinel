@@ -29,16 +29,25 @@ body {
   margin: 0;
   padding: 0; /* Убедитесь, что padding body равен 0 */
   overflow-x: hidden; /* Предотвращает горизонтальную прокрутку */
-  place-items: center; /* Это может конфликтовать с flexbox или grid в корневых компонентах, рассмотрите удаление, если есть проблемы с компоновкой */
+  /* place-items: center; */ /* Это может конфликтовать с flexbox или grid в корневых компонентах, рассмотрите удаление, если есть проблемы с компоновкой */
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f0f0f0ce;
+  /* ИЗМЕНЕНО: Устанавливаем фоновую картинку для body и делаем фон прозрачным,
+     чтобы картинка была видна сразу под хедером */
+  background-size: cover; /* Картинка будет покрывать всю область */
+  background-repeat: no-repeat; /* Не повторять картинку */
+  background-attachment: fixed; /* Картинка будет фиксированной при прокрутке */
+  background-color: transparent; /* Делаем фон body прозрачным */
   color: #000000;
 }
 
 /* Тёмная тема */
 body.dark-theme {
-  background-color: #272727;
+  /* ИЗМЕНЕНО: Устанавливаем темный фон для body в темной теме, если нет фоновой картинки */
+  background-color: #171717; /* Темнее, чтобы соответствовать хедеру */
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: #ffffff;
 }
 
@@ -262,10 +271,13 @@ button {
 
 /* Стили для контейнера, который оборачивает все маршруты, кроме заголовка */
 .main-content-wrapper {
-  padding-top: 50px; /* Отступ сверху, чтобы содержимое не перекрывалось заголовком.
-                         Отрегулируйте это значение, если высота вашего ProfileHeader изменится.
-                         Ваш ProfileHeader имеет height: 50px, поэтому 70px даст небольшой зазор. */
-  min-height: calc(100vh - 70px); /* Убедитесь, что контент занимает всю оставшуюся высоту */
+  /* ИЗМЕНЕНО: Отступ сверху, чтобы содержимое не перекрывалось заголовком.
+     Ваш ProfileHeader имеет height: 30px и padding: 15px сверху и снизу.
+     Общая высота: 15 + 30 + 15 = 60px.
+     Поэтому padding-top должен быть не менее 60px. */
+  padding-top: 60px; /* Скорректировано */
+  /* ИЗМЕНЕНО: min-height должен учитывать полную высоту хедера */
+  min-height: calc(100vh - 60px); /* Вычитаем полную высоту хедера */
   box-sizing: border-box; /* Включает padding в общую высоту/ширину */
 }
 
@@ -281,12 +293,12 @@ button {
   button {
     background-color: #f9f9f9;
   }
-  
+
   /* Адаптация ваших стилей для светлой темы */
   .auth-container {
     border-color: #ccc;
   }
-  
+
   header nav {
     background: #e0e0e0;
   }

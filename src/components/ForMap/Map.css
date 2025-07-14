@@ -45,3 +45,9 @@
 .drawing-info-box div {
   line-height: 1.4;
 }
+
+/* Скрываем контейнеры управления в правом верхнем и левом верхнем углах */
+.leaflet-control-container .leaflet-top.leaflet-right,
+.leaflet-control-container .leaflet-top.leaflet-left {
+  display: none !important; /* Убираем эти блоки полностью */
+}

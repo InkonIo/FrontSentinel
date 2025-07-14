@@ -20,7 +20,7 @@ body {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* Мягкая тень */
 
   font-family: 'Inter', sans-serif;
-  height: 50px;
+  height: 30px;
   position: fixed;
   top: 0;
   left: 0;
@@ -59,7 +59,7 @@ body {
   text-decoration: none;
   font-weight: 400;
   font-size: 13px;
-  padding: 8px 0;
+  padding: 0px 0;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;

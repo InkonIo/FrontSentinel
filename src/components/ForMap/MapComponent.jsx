@@ -1,6 +1,6 @@
 // components/ForMap/MapComponent.jsx
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { MapContainer, TileLayer, FeatureGroup, WMSTileLayer } from 'react-leaflet';
+import { MapContainer, TileLayer, FeatureGroup, WMSTileLayer, useMap } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import * as L from 'leaflet';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -8,7 +8,8 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 import DrawingHandler from './DrawingHandler';
-import MapInteractionHandler from './MapInteractionHandler';
+import PolygonAndMarkerLayer from './PolygonAndMarkerLayer';
+import PolygonAnalysisLayer from './PolygonAnalysisLayer';
 
 // Исправляем иконки по умолчанию для Leaflet Draw
 L.Icon.Default.mergeOptions({
@@ -24,36 +25,52 @@ export default function MapComponent({
   setIsDrawing,
   isDrawing,
   editableFGRef,
-  selectedPolygon,
+  selectedPolygon, // Получаем из родителя
+  setSelectedPolygon, // Получаем из родителя
   isEditingMode,
   editingMapPolygon,
-  onSelectAnalysisForPolygon,
-  activeAnalysisType,
-  isAnalysisLoading,
-  onLoadingChange,
-  onError,
+  onSelectAnalysisForPolygon, // Теперь этот пропс используется здесь
+  activeAnalysisType, // Получаем из родителя
+  setActiveAnalysisType, // Функция для установки активного типа анализа
+  onLoadingChange,      // <--- ЭТОТ ПРОПС НУЖНО ИСПОЛЬЗОВАТЬ
+  onError,              // <--- ЭТОТ ПРОПС НУЖНО ИСПОЛЬЗОВАТЬ
+  onPointAdded,
   analysisDateRange,
-  onPointAdded // Колбэк для уведомления о добавлении точки
 }) {
-  const mapRef = useRef(null);
-  const [mapInstance, setMapInstance] = useState(null); // СОСТОЯНИЕ для экземпляра карты
-  const [zoom, setZoom] = useState(13);
+  const mapRef = useRef();
+  const [mapInstance, setMapInstance] = useState(null);
+  const [currentZoom, setCurrentZoom] = useState(13);
+
+  const flyToMarker = useCallback((center, zoom) => {
+    if (mapRef.current) {
+      mapRef.current.flyTo(center, zoom);
+    }
+  }, []);
+
+  function MapEventsHandler() {
+    const map = useMap();
+    useEffect(() => {
+      if (map) {
+        mapRef.current = map;
+        setMapInstance(map);
+        console.log('MapEventsHandler: mapInstance установлен в:', map);
+      }
+    }, [map, setMapInstance]);
+    return null;
+  }
 
   const calculateArea = useCallback((coordinates) => {
     const outerRing = Array.isArray(coordinates[0][0]) ? coordinates[0] : coordinates;
-
     if (outerRing.length < 3) return 0;
     const toRadians = (deg) => (deg * Math.PI) / 180;
     const R = 6371000;
     let area = 0;
     const n = outerRing.length;
-
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
       const lat1 = toRadians(outerRing[i][0]);
       const lat2 = toRadians(outerRing[j][0]);
       const deltaLon = toRadians(outerRing[j][1] - outerRing[i][1]);
-
       const E =
         2 *
         Math.asin(
@@ -75,37 +92,38 @@ export default function MapComponent({
     return `${(area / 1000000).toFixed(1)} км²`;
   }, []);
 
-  const stopAndSaveDrawingFromMap = useCallback((currentPath) => {
-    if (currentPath && currentPath.length >= 3) {
-      onPolygonComplete(currentPath);
-    }
-    setIsDrawing(false);
-    if (window.clearCurrentPath) window.clearCurrentPath();
-  }, [onPolygonComplete, setIsDrawing]);
-
+  // Эффект для инициализации EditControl при изменении editingMapPolygon
   useEffect(() => {
-    if (isEditingMode && editableFGRef.current && editingMapPolygon) {
-      console.log('[MapComponent useEffect] Editing mode active, ref and polygon available.');
-      editableFGRef.current.clearLayers();
-
-      const leafletPolygon = L.polygon(editingMapPolygon.coordinates);
-      editableFGRef.current.addLayer(leafletPolygon);
-
+    if (isEditingMode && editingMapPolygon && editableFGRef.current) {
+      const layerGroup = editableFGRef.current;
+      layerGroup.clearLayers();
+      const leafletPolygon = L.polygon(editingMapPolygon.coordinates, {
+        color: editingMapPolygon.color,
+        fillOpacity: 0.2,
+        weight: 4,
+      }).addTo(layerGroup);
       if (leafletPolygon.editing) {
         leafletPolygon.editing.enable();
-        console.log('[MapComponent useEffect] Enabled Leaflet editing for polygon:', editingMapPolygon.id);
+        console.log(`EditControl: Editing enabled for polygon ID: ${editingMapPolygon.id}`);
       } else {
-        console.error('[MapComponent useEffect] Leaflet polygon editing not available for this layer.');
+        console.warn(`EditControl: Editing not available for polygon ID: ${editingMapPolygon.id}. Check Leaflet.Editable plugin.`);
       }
+      // mapRef.current?.fitBounds(leafletPolygon.getBounds()); // УДАЛЕНО: Больше не приближаем автоматически
     } else if (!isEditingMode && editableFGRef.current) {
       editableFGRef.current.clearLayers();
-      console.log('[MapComponent useEffect] Editing mode off, cleared editable layers.');
     }
-  }, [isEditingMode, editableFGRef, editingMapPolygon]);
+  }, [isEditingMode, editingMapPolygon, editableFGRef]);
 
-  // УДАЛЕН: useEffect для прослушивания событий DRAWVERTEX на mapInstance,
-  // так как теперь DrawingHandler будет напрямую вызывать onPointAdded.
-  // Это предотвращает дублирование и обеспечивает более надежный вызов.
+  // Сбрасываем activeAnalysisType при изменении selectedPolygon
+  useEffect(() => {
+    if (!selectedPolygon && activeAnalysisType) {
+      setActiveAnalysisType(''); // Сбрасываем тип анализа, если полигон не выбран
+      console.log('MapComponent: selectedPolygon сброшен, сбрасываем activeAnalysisType.');
+    }
+  }, [selectedPolygon, activeAnalysisType, setActiveAnalysisType]);
+
+
+  console.log('MapComponent render check: selectedPolygon:', selectedPolygon, 'activeAnalysisType:', activeAnalysisType, 'mapInstance:', mapInstance);
 
   return (
     <MapContainer
@@ -115,29 +133,48 @@ export default function MapComponent({
       ref={mapRef}
       zoomControl={false}
       whenCreated={(mapInstance) => {
-        mapRef.current = mapInstance;
-        setMapInstance(mapInstance); // СОХРАНЯЕМ ЭКЗЕМПЛЯР КАРТЫ В СОСТОЯНИЕ
-        setZoom(mapInstance.getZoom());
+        if (mapInstance) {
+          mapRef.current = mapInstance;
+          setMapInstance(mapInstance);
+          console.log('MapContainer: mapInstance установлен в whenCreated:', mapInstance);
+          setCurrentZoom(mapInstance.getZoom());
+        }
       }}
     >
-      {/* Передаем все необходимые пропсы, включая mapInstance */}
-      <MapInteractionHandler 
-        mapInstance={mapInstance} // <-- ПЕРЕДАЕМ ЭКЗЕМПЛЯР КАРТЫ
+      <MapEventsHandler />
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      <PolygonAndMarkerLayer
         polygons={polygons}
         selectedPolygon={selectedPolygon}
+        setSelectedPolygon={setSelectedPolygon}
         onSelectAnalysisForPolygon={onSelectAnalysisForPolygon}
         activeAnalysisType={activeAnalysisType}
         analysisDateRange={analysisDateRange}
-        onLoadingChange={onLoadingChange}
-        onError={onError}
+        onLoadingChange={onLoadingChange} // <--- ИЗМЕНЕНО: Используем пропс onLoadingChange
+        onError={onError} // <--- ИЗМЕНЕНО: Используем пропс onError
         calculateArea={calculateArea}
         formatArea={formatArea}
-        setZoom={setZoom}
+        flyToMarker={flyToMarker}
+        map={mapInstance}
       />
 
+      {selectedPolygon && activeAnalysisType && mapInstance && (
+        <PolygonAnalysisLayer
+          map={mapInstance}
+          selectedPolygonData={selectedPolygon}
+          activeAnalysisType={activeAnalysisType}
+          analysisDateRange={analysisDateRange}
+          onLoadingChange={onLoadingChange} // <--- ИЗМЕНЕНО: Используем пропс onLoadingChange
+          onError={onError} // <--- ИЗМЕНЕНО: Используем пропс onError
+        />
+      )}
+
       <WMSTileLayer
-        url="https://services.sentinel-hub.com/ogc/wms/5b29f7b4-15d8-44b1-b89e-345252847af1" // Ваш Instance ID
-        layers="2_TONEMAPPED_NATURAL_COLOR" // Стандартное название слоя для True Color Sentinel-2 L2A
+        url="https://services.sentinel-hub.com/ogc/wms/5c9e1f51-c86f-4b6f-ad22-8310886f2aab"
+        layers="2_TONEMAPPED_NATURAL_COLOR"
         format="image/png"
         transparent={true}
         version="1.3.0"
@@ -145,25 +182,26 @@ export default function MapComponent({
 
       <DrawingHandler
         onPolygonComplete={onPolygonComplete}
-        onStopAndSave={stopAndSaveDrawingFromMap}
+        onStopAndSave={window.getCurrentPath}
         isDrawing={isDrawing}
         setIsDrawing={setIsDrawing}
-        onPointAdded={onPointAdded} // <-- ТЕПЕРЬ ПЕРЕДАЕМ onPointAdded В DrawingHandler
+        onPointAdded={onPointAdded}
       />
 
       {isEditingMode && (
         <FeatureGroup ref={editableFGRef}>
           <EditControl
-            position="topright"
+            position="topright" // Кнопки будут в правом верхнем углу
             onEdited={onPolygonEdited}
             draw={{
               polygon: false, rectangle: false, polyline: false,
-              circle: false, marker: false, circlemarker: false
+              circle: false, marker: false, circlemarker: false,
             }}
             edit={{
               featureGroup: editableFGRef.current,
               remove: false,
-              edit: false,
+              // *** Добавьте эту строку, чтобы скрыть кнопку 'Edit layers' ***
+              edit: false // Это скроет кнопку 'Edit layers'
             }}
           />
         </FeatureGroup>

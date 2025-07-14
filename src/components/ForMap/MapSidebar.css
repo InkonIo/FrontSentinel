@@ -59,7 +59,7 @@ body {
 /* Main Titles */
 .map-sidebar-section-title {
   color: #ffffff; /* White title */
-  margin-bottom: 10px; /* Reduced margin */
+  margin-bottom: 0px; /* Reduced margin */
   font-size: 20px; /* Reduced font size */
   font-weight: 700;
   text-shadow: 0 1px 3px rgba(0,0,0,0.4); /* Stronger text shadow */
@@ -71,7 +71,7 @@ body {
   height: 1px; /* Thinner rule */
   /* Orange accent line from EarthData */
   background: linear-gradient(to right, rgba(200, 80, 0, 0.8), rgba(255, 150, 50, 0.8), rgba(200, 80, 0, 0.8));
-  margin: 0;
+  margin: 5px;
   box-shadow: 0 1px 3px rgba(255, 120, 30, 0.3);
 }
 

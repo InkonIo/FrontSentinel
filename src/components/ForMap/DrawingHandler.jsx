@@ -36,7 +36,8 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
         // Вызываем onPointAdded каждый раз, когда добавляется новая точка
         if (onPointAdded) {
           console.log('DrawingHandler: Calling onPointAdded.');
-          onPointAdded();
+          // Оборачиваем в setTimeout, чтобы отложить вызов и избежать StrictMode предупреждений
+          setTimeout(() => onPointAdded(), 0); 
         }
         return updatedPath;
       });
@@ -47,9 +48,12 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
       if (!isDrawing || currentPath.length < 3) return;
 
       // Завершаем рисование: передаем полный путь полигона родительскому компоненту
-      onPolygonComplete(currentPath);
-      setCurrentPath([]); // Очищаем текущий путь
-      setIsDrawing(false); // Выключаем режим рисования
+      // Оборачиваем в setTimeout, чтобы отложить вызов и избежать StrictMode предупреждений
+      setTimeout(() => {
+        onPolygonComplete(currentPath);
+        setCurrentPath([]); // Очищаем текущий путь
+        setIsDrawing(false); // Выключаем режим рисования
+      }, 0);
     },
     mousemove: (e) => {
       console.log('DrawingHandler: Mousemove event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
@@ -76,15 +80,17 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
     : currentPath;
 
   // Рендерим полигон только если точек достаточно для его формирования (минимум 3, для отображения линии достаточно 2 точки, но для завершенного полигона нужно 3)
-  if (displayPath.length > 2) {
+  // Изменено на > 1 для отображения линии из двух точек
+  if (displayPath.length > 1) { 
     return (
       <Polygon
         positions={displayPath} // Координаты для отображения
         pathOptions={{
-          color: 'blue', // Цвет обводки
-          fillOpacity: 0.2, // Прозрачность заливки
-          dashArray: '5, 5', // Пунктирная линия
-          weight: 2 // Толщина линии
+          color: '#FF0000', // Красный цвет для рисуемого полигона
+          weight: 3,
+          opacity: 0.7,
+          fillOpacity: 0.2,
+          dashArray: '5, 10' // Пунктирная линия
         }}
       />
     );

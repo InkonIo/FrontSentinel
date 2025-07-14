@@ -1,18 +1,14 @@
 // components/ForMap/MapSidebar.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom'; // Import Link for consistency
-import './MapSidebar.css'; // Import the updated CSS
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import './MapSidebar.css';
 
 export default function MapSidebar({
   polygons,
-  selectedPolygon,
-  setSelectedPolygon,
+  selectedPolygon, // Теперь это объект полигона или null
+  setSelectedPolygon, // Функция для установки выбранного полигона (принимает объект)
   deletePolygon,
-  handleEditPolygon,
-  crops,
-  loadingCrops,
-  cropsError,
-  fetchCropsFromAPI,
+  handleEditPolygon, // Принимает ID полигона
   clearAllCrops,
   updatePolygonCrop,
   calculateArea,
@@ -27,20 +23,28 @@ export default function MapSidebar({
   showMyPolygons,
   updatePolygonName,
   updatePolygonComment,
-  updatePolygonColor, // НОВЫЙ ПРОП: для обновления цвета полигона
+  updatePolygonColor,
   isSavingPolygon,
   isFetchingPolygons,
   showCropsSection,
   savePolygonToDatabase,
+  BASE_API_URL,
 }) {
-  const [activeSection, setActiveSection] = useState('map'); // Start with 'map' as default for this component
+  const [activeSection, setActiveSection] = useState('map');
   const [showPolygonsList, setShowPolygonsList] = useState(true);
-  // Removed isBurgerMenuOpen state as the burger menu is being removed
+
+  const [chapters, setChapters] = useState([]);
+  const [selectedChapter, setSelectedChapter] = useState('');
+  const [cropsByChapter, setCropsByChapter] = useState([]);
+  const [selectedCrop, setSelectedCrop] = useState('');
+  const [varietiesByCrop, setVarietiesByCrop] = useState([]);
+  const [selectedVariety, setSelectedVariety] = useState('');
+  const [loadingCropData, setLoadingCropData] = useState(false);
+  const [cropDataError, setCropDataError] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine active section based on current path
   useEffect(() => {
     if (location.pathname === '/') setActiveSection('home');
     else if (location.pathname === '/dashboard') setActiveSection('map');
@@ -49,15 +53,170 @@ export default function MapSidebar({
     else setActiveSection('');
   }, [location.pathname]);
 
-  // Removed toggleBurgerMenu function as the burger menu is being removed
-  // Removed handleNavigate function as it was only used by the burger menu
+  const fetchApiData = useCallback(async (url, setter, errorMessage) => {
+    setLoadingCropData(true);
+    setCropDataError(null);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setCropDataError('Ошибка: Токен аутентификации отсутствует. Пожалуйста, войдите в систему.');
+      setLoadingCropData(false);
+      return;
+    }
+    console.log(`MapSidebar: Fetching data from URL: ${url}`); // Log URL request
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        const errorText = await response.text(); // Attempt to get error text
+        throw new Error(`Ошибка загрузки: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      console.log(`MapSidebar: Successfully fetched data from ${url}:`, data); // Log received data
+
+      // Data format check and state setting
+      if (Array.isArray(data)) {
+        if (url.includes('/chapters')) {
+          // For chapters, expect an array of strings
+          setter(data.filter(item => typeof item === 'string'));
+        } else if (url.includes('/by-chapter')) {
+          // For crops by chapter, expect an array of objects with 'name'
+          setter(data.filter(item => item && typeof item.name === 'string'));
+        } else if (url.includes('/by-crop')) {
+          // For varieties by crop, expect a direct array of variety objects
+          // Each object has a 'name' property
+          setter(data.filter(item => item && typeof item.name === 'string').map(variety => variety.name));
+        } else {
+          console.warn(`MapSidebar: Unexpected data format for URL ${url}. Setting as is.`, data);
+          setter(data); // As a fallback
+        }
+      } else {
+        console.error(`MapSidebar: API response from ${url} is not an array:`, data);
+        setCropDataError(`Некорректный формат данных от сервера для ${url}.`);
+        setter([]);
+      }
+    } catch (error) {
+      console.error(errorMessage, error);
+      setCropDataError(errorMessage + `: ${error.message}`);
+      setter([]);
+    } finally {
+      setLoadingCropData(false);
+    }
+  }, []);
+
+  // Load chapters on component mount
+  useEffect(() => {
+    console.log('MapSidebar: useEffect for chapters triggered.');
+    fetchApiData(`${BASE_API_URL}/api/v1/crops/chapters`, setChapters, 'Не удалось загрузить главы культур');
+  }, [fetchApiData, BASE_API_URL]);
+
+  // Load crops when a chapter is selected
+  useEffect(() => {
+    console.log('MapSidebar: useEffect for cropsByChapter triggered. selectedChapter:', selectedChapter);
+    if (selectedChapter) {
+      fetchApiData(`${BASE_API_URL}/api/v1/crops/by-chapter?chapter=${encodeURIComponent(selectedChapter)}`, setCropsByChapter, 'Не удалось загрузить культуры для выбранной главы');
+      setSelectedCrop(''); // Reset crop when chapter changes
+      setVarietiesByCrop([]); // Clear varieties
+      setSelectedVariety(''); // Clear selected variety
+    } else {
+      setCropsByChapter([]);
+      setSelectedCrop('');
+      setVarietiesByCrop([]);
+      setSelectedVariety('');
+    }
+  }, [selectedChapter, fetchApiData, BASE_API_URL]);
+
+  // Load varieties when a crop is selected
+  useEffect(() => {
+    console.log('MapSidebar: useEffect for varietiesByCrop triggered. selectedCrop:', selectedCrop);
+    if (selectedCrop) {
+      fetchApiData(`${BASE_API_URL}/api/v1/crops/by-crop?crop=${encodeURIComponent(selectedCrop)}`, setVarietiesByCrop, 'Не удалось загрузить сорта для выбранной культуры');
+      setSelectedVariety(''); // Reset variety when crop changes
+    } else {
+      setVarietiesByCrop([]);
+      setSelectedVariety('');
+    }
+  }, [selectedCrop, fetchApiData, BASE_API_URL]);
+
+  // handleUpdatePolygonCrop: Changed separator from " -> " to ","
+  const handleUpdatePolygonCrop = useCallback((polygonId, chapter, crop, variety) => {
+    const parts = [];
+    if (chapter) {
+      parts.push(chapter);
+    }
+    if (crop) {
+      parts.push(crop);
+    }
+    if (variety) {
+      parts.push(variety);
+    }
+    const fullCropName = parts.join(','); // Join with comma
+
+    console.log(`MapSidebar: handleUpdatePolygonCrop called for polygon ${polygonId}. New fullCropName: ${fullCropName}`);
+
+    const currentPolygonInProps = polygons.find(p => p.id === polygonId);
+
+    if (currentPolygonInProps && currentPolygonInProps.crop !== fullCropName) {
+      updatePolygonCrop(polygonId, fullCropName);
+      const polyToSave = { ...currentPolygonInProps, crop: fullCropName };
+      savePolygonToDatabase(polyToSave, true);
+    }
+  }, [polygons, updatePolygonCrop, savePolygonToDatabase]);
+
+  // useEffect for pre-selection: Changed split delimiter to ","
+  // Added dependencies on fetched data and loading state
+  useEffect(() => {
+    console.log('MapSidebar: useEffect for selectedPolygon change triggered. selectedPolygon:', selectedPolygon);
+    console.log('MapSidebar: Current chapters, cropsByChapter, varietiesByCrop:', chapters, cropsByChapter, varietiesByCrop);
+    console.log('MapSidebar: Loading crop data:', loadingCropData);
+
+    // <--- ИЗМЕНЕНО: Проверяем, что selectedPolygon - это объект и что данные загружены
+    if (selectedPolygon && selectedPolygon.id && !loadingCropData && chapters.length > 0) { 
+      const polygon = polygons.find(p => p.id === selectedPolygon.id); // <--- ИЗМЕНЕНО: Ищем по ID
+      if (polygon && polygon.crop) {
+        const parts = polygon.crop.split(','); // Split by comma
+        console.log('MapSidebar: Parsing existing crop for pre-selection:', polygon.crop, 'Parts:', parts);
+
+        const chapterFromPolygon = parts[0] || '';
+        const cropFromPolygon = parts[1] || '';
+        const varietyFromPolygon = parts[2] || '';
+
+        if (chapters.includes(chapterFromPolygon)) {
+            setSelectedChapter(chapterFromPolygon);
+        } else {
+            setSelectedChapter('');
+        }
+
+        if (cropFromPolygon && cropsByChapter.some(c => c.name === cropFromPolygon)) {
+            setSelectedCrop(cropFromPolygon);
+        } else {
+            setSelectedCrop('');
+        }
+
+        if (varietyFromPolygon && varietiesByCrop.includes(varietyFromPolygon)) {
+            setSelectedVariety(varietyFromPolygon);
+        } else {
+            setSelectedVariety('');
+        }
+
+      } else {
+        console.log('MapSidebar: No existing crop for selected polygon, resetting selections.');
+        setSelectedChapter('');
+        setSelectedCrop('');
+        setSelectedVariety('');
+      }
+    } else if (!selectedPolygon) { // <--- ИЗМЕНЕНО: Если selectedPolygon null
+      console.log('MapSidebar: No polygon selected, resetting all crop selections.');
+      setSelectedChapter('');
+      setSelectedCrop('');
+      setSelectedVariety('');
+    }
+  }, [selectedPolygon, polygons, chapters, cropsByChapter, varietiesByCrop, loadingCropData]); // Added dependencies
 
   return (
-    // The main container for the map sidebar content
     <div className={`map-sidebar-container`}>
-      {/* Burger Menu Button and Dropdown Menu are removed */}
-
-      {/* Wrapper for scrollable content */}
       <div className="map-sidebar-content-wrapper">
         <h2 className="map-sidebar-section-title" data-text="Управление картой">Управление картой</h2>
         <hr className="map-sidebar-hr" />
@@ -92,7 +251,7 @@ export default function MapSidebar({
             className="map-sidebar-button toggle-list-button"
             aria-label={isFetchingPolygons ? 'Загружаю список' : (showPolygonsList ? 'Скрыть список полигонов' : 'Показать список полигонов')}
           >
-            {isFetchingPolygons ? '📂 Загружаю...' : (showPolygonsList ? '🙈 Список' : '👀 Список')}
+            {isFetchingPolygons ? '📂 Загружаю...' : '👀 Список'}
           </button>
         </div>
 
@@ -107,14 +266,15 @@ export default function MapSidebar({
               {polygons.map((polygon, idx) => (
                 <div
                   key={polygon.id}
-                  className={`polygon-item ${selectedPolygon === polygon.id ? 'selected' : ''}`}
+                  className={`polygon-item ${selectedPolygon && selectedPolygon.id === polygon.id ? 'selected' : ''}`}
                   onClick={() => {
-                    setSelectedPolygon(polygon.id);
-                    handleEditPolygon(polygon.id);
+                    // <--- ИЗМЕНЕНО: Передаем полный объект полигона
+                    setSelectedPolygon(polygon); 
+                    handleEditPolygon(polygon.id); // handleEditPolygon все еще ожидает ID
                   }}
                 >
                   <div className="polygon-item-header">
-                    {selectedPolygon === polygon.id ? (
+                    {selectedPolygon && selectedPolygon.id === polygon.id ? (
                       <input
                         type="text"
                         value={polygon.name || ''}
@@ -159,7 +319,7 @@ export default function MapSidebar({
                       >
                         Удалить
                       </button>
-                      {(selectedPolygon === polygon.id && (isEditingMode || isDrawing)) && (
+                      {(selectedPolygon && selectedPolygon.id === polygon.id && (isEditingMode || isDrawing)) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleStopAndSaveEdit(polygon.id); }}
                           disabled={(!isEditingMode && !isDrawing) || isSavingPolygon || isFetchingPolygons}
@@ -174,13 +334,11 @@ export default function MapSidebar({
                     <div className="polygon-details-row">
                       <span>Точек: {polygon.coordinates.length}</span>
                       <span>Площадь: {formatArea(calculateArea(polygon.coordinates))}</span>
-                      {/* Отображение цвета полигона */}
                       <div style={{ backgroundColor: polygon.color }} className="polygon-color-box"></div>
                     </div>
                   </div>
-                  {selectedPolygon === polygon.id && (
+                  {selectedPolygon && selectedPolygon.id === polygon.id && (
                     <div className="polygon-meta-edit">
-                      {/* Выбор цвета полигона */}
                       <div className="polygon-meta-group">
                         <label htmlFor={`color-picker-${polygon.id}`} className="polygon-detail-label">
                           Цвет полигона:
@@ -188,7 +346,7 @@ export default function MapSidebar({
                         <input
                           id={`color-picker-${polygon.id}`}
                           type="color"
-                          value={polygon.color || '#000000'} // Значение по умолчанию, если цвет не установлен
+                          value={polygon.color || '#000000'}
                           onChange={(e) => {
                             e.stopPropagation();
                             updatePolygonColor(polygon.id, e.target.value);
@@ -202,41 +360,108 @@ export default function MapSidebar({
                             }
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="polygon-color-input" // Новый класс для стилизации
+                          className="polygon-color-input"
                           disabled={isSavingPolygon || isFetchingPolygons}
                         />
                       </div>
 
                       <div className="polygon-meta-group">
-                        <label htmlFor={`crop-select-${polygon.id}`} className="polygon-detail-label">
-                          Культура:
+                        <label htmlFor={`chapter-select-${polygon.id}`} className="polygon-detail-label">
+                          Глава культуры:
                         </label>
                         <select
-                          id={`crop-select-${polygon.id}`}
-                          value={polygon.crop || ''}
+                          id={`chapter-select-${polygon.id}`}
+                          value={selectedChapter}
                           onChange={(e) => {
                             e.stopPropagation();
-                            updatePolygonCrop(polygon.id, e.target.value);
+                            console.log('MapSidebar: Chapter selected:', e.target.value);
+                            setSelectedChapter(e.target.value);
+                            setSelectedCrop('');
+                            setSelectedVariety('');
+                            handleUpdatePolygonCrop(polygon.id, e.target.value, '', '');
                           }}
                           onBlur={(e) => {
-                            e.stopPropagation();
-                            const originalPoly = polygons.find(p => p.id === polygon.id);
-                            if (originalPoly && originalPoly.crop !== e.target.value) {
-                                const polyToSave = { ...originalPoly, crop: e.target.value };
-                                savePolygonToDatabase(polyToSave, true);
-                            }
+                              e.stopPropagation();
                           }}
-                          disabled={isSavingPolygon || isFetchingPolygons}
+                          disabled={isSavingPolygon || isFetchingPolygons || loadingCropData}
                           className="polygon-crop-select"
                         >
-                          <option value="">Выберите культуру</option>
-                          {crops.map((crop) => (
-                            <option key={crop} value={crop}>
-                              {crop}
+                          <option value="">Выберите главу</option>
+                          {chapters.map((chapter) => (
+                            <option key={chapter} value={chapter}>
+                              {chapter}
                             </option>
                           ))}
                         </select>
                       </div>
+
+                      {selectedChapter && (
+                        <div className="polygon-meta-group">
+                          <label htmlFor={`crop-select-${polygon.id}`} className="polygon-detail-label">
+                            Культура:
+                          </label>
+                          <select
+                            id={`crop-select-${polygon.id}`}
+                            value={selectedCrop}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              console.log('MapSidebar: Crop selected:', e.target.value);
+                              setSelectedCrop(e.target.value);
+                              setSelectedVariety('');
+                              handleUpdatePolygonCrop(polygon.id, selectedChapter, e.target.value, '');
+                            }}
+                            onBlur={(e) => {
+                                e.stopPropagation();
+                            }}
+                            disabled={isSavingPolygon || isFetchingPolygons || loadingCropData || !selectedChapter}
+                            className="polygon-crop-select"
+                          >
+                            <option value="">Выберите культуру</option>
+                            {cropsByChapter.map((crop) => (
+                              <option key={crop.name || ''} value={crop.name || ''}>
+                                {crop.name || 'Неизвестная культура'}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {selectedCrop && (
+                        <div className="polygon-meta-group">
+                          <label htmlFor={`variety-select-${polygon.id}`} className="polygon-detail-label">
+                            Сорт:
+                          </label>
+                          <select
+                            id={`variety-select-${polygon.id}`}
+                            value={selectedVariety}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              console.log('MapSidebar: Variety selected:', e.target.value);
+                              setSelectedVariety(e.target.value);
+                              handleUpdatePolygonCrop(polygon.id, selectedChapter, selectedCrop, e.target.value);
+                            }}
+                            onBlur={(e) => {
+                                e.stopPropagation();
+                            }}
+                            disabled={isSavingPolygon || isFetchingPolygons || loadingCropData || !selectedCrop}
+                            className="polygon-crop-select"
+                          >
+                            <option value="">Выберите сорт</option>
+                            {varietiesByCrop.map((variety) => (
+                              <option key={variety} value={variety}>
+                                {variety}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {cropDataError && (
+                        <div className="crops-error-message">
+                          ⚠️ {cropDataError}
+                        </div>
+                      )}
+
                       <div className="polygon-meta-group">
                         <label htmlFor={`comment-input-${polygon.id}`} className="polygon-detail-label">
                           Комментарий:
@@ -276,7 +501,7 @@ export default function MapSidebar({
                       </div>
                     </div>
                   )}
-                  {selectedPolygon !== polygon.id && (
+                  {selectedPolygon && selectedPolygon.id !== polygon.id && (
                     <div className="polygon-summary-display">
                       {polygon.crop && `🌾 ${polygon.crop}`}
                       {polygon.crop && polygon.comment && ' | '}
@@ -288,7 +513,7 @@ export default function MapSidebar({
             </div>
           </div>
         )}
-      </div> {/* End of map-sidebar-content-wrapper */}
+      </div>
 
       {showCropsSection && (
         <div className="crops-summary-section">
@@ -298,12 +523,12 @@ export default function MapSidebar({
             </h4>
             <div className="crops-summary-actions">
               <button
-                onClick={fetchCropsFromAPI}
-                disabled={loadingCrops || isSavingPolygon || isFetchingPolygons}
+                onClick={() => fetchApiData(`${BASE_API_URL}/api/v1/crops/chapters`, setChapters, 'Не удалось обновить главы культур')}
+                disabled={loadingCropData || isSavingPolygon || isFetchingPolygons}
                 className="crops-summary-button"
                 aria-label="Обновить данные по культурам"
               >
-                {loadingCrops ? 'Загружаю...' : '🔄'}
+                {loadingCropData ? 'Загружаю...' : ''}
               </button>
               <button
                 onClick={clearAllCrops}
@@ -316,9 +541,9 @@ export default function MapSidebar({
             </div>
           </div>
 
-          {cropsError && (
+          {cropDataError && (
             <div className="crops-error-message">
-              ⚠️ {cropsError}
+              ⚠️ {cropDataError}
             </div>
           )}
 
@@ -340,15 +565,15 @@ export default function MapSidebar({
                     {Object.entries(
                       polygons.filter((p) => p.crop).reduce((acc, p) => {
                         const area = calculateArea(p.coordinates);
-                        const baseCrop = p.crop;
-                        if (baseCrop) {
-                            acc[baseCrop] = (acc[baseCrop] || 0) + area;
+                        const fullCrop = p.crop;
+                        if (fullCrop) {
+                            acc[fullCrop] = (acc[fullCrop] || 0) + area;
                         }
                         return acc;
                       }, {})
-                    ).map(([crop, area]) => (
-                      <div key={crop} className="crop-tag">
-                        {crop}: {formatArea(area)}
+                    ).map(([fullCrop, area]) => (
+                      <div key={fullCrop} className="crop-tag">
+                        {fullCrop}: {formatArea(area)}
                       </div>
                     ))}
                   </div>

@@ -5,16 +5,16 @@ import L from 'leaflet';
 // >>> ВАЖНО: УСТАНОВИТЕ ВАШ БАЗОВЫЙ URL БЭКЕНДА ЗДЕСЬ! <<<
 // Он должен быть ТОЛЬКО корнем вашего домена/приложения, без '/api' или '/polygons'.
 // Например: 'http://localhost:8080' для локальной разработки, или
-// 'https://your-backend-app.com' для вашего развернутого бэкенда.
-const BASE_API_URL = 'http://localhost:8080'; // Обновленный URL
+// 'back-production-b3f2.up.railway.app' для вашего развернутого бэкенда.
+const BASE_API_URL = 'https://back-production-b3f2.up.railway.app'; // Обновленный URL
 
 export default function PolygonAnalysisLayer({
   map, // Теперь принимаем map как пропс
   selectedPolygonData, // Полные данные выбранного полигона (включая coordinates)
-  activeAnalysisType,   // Например: 'NDVI', 'TRUE_COLOR'
-  analysisDateRange,    // Объект { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
-  onLoadingChange,      // Коллбэк для уведомления родителя о состоянии загрузки
-  onError               // Коллбэк для уведомления родителя об ошибках
+  activeAnalysisType,    // Например: 'NDVI', 'TRUE_COLOR'
+  analysisDateRange,     // Объект { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
+  onLoadingChange,       // Коллбэк для уведомления родителя о состоянии загрузки
+  onError                // Коллбэк для уведомления родителя об ошибках
 }) {
   const [analysisImageUrl, setAnalysisImageUrl] = useState(null);
   const [imageBounds, setImageBounds] = useState(null); // Границы для ImageOverlay
@@ -25,7 +25,8 @@ export default function PolygonAnalysisLayer({
     console.log('   selectedPolygonData:', selectedPolygonData);
     console.log('   activeAnalysisType:', activeAnalysisType);
     console.log('   analysisDateRange:', analysisDateRange);
-    console.log('   map:', map);
+    console.log('   map:', map); // <--- ВАЖНО: Проверяем, что map не null
+    console.log('   selectedPolygonData.coordinates:', selectedPolygonData?.coordinates); // <--- ДОБАВЛЕНО: Логируем координаты
 
     // Проверяем наличие необходимых данных, включая map
     if (!selectedPolygonData || !activeAnalysisType || !analysisDateRange || !map) {
@@ -42,7 +43,7 @@ export default function PolygonAnalysisLayer({
     try {
       // Убедимся, что selectedPolygonData.coordinates существует и является массивом
       if (!selectedPolygonData.coordinates || !Array.isArray(selectedPolygonData.coordinates) || selectedPolygonData.coordinates.length === 0) {
-        console.error('fetchAnalysisImage: selectedPolygonData.coordinates отсутствует или пуст.');
+        console.error('fetchAnalysisImage: selectedPolygonData.coordinates отсутствует или пуст. Текущие данные:', selectedPolygonData); // <--- ОБНОВЛЕНО: Добавлены текущие данные
         onError('Ошибка: Данные координат полигона отсутствуют.');
         onLoadingChange(false);
         return;
@@ -52,11 +53,11 @@ export default function PolygonAnalysisLayer({
       // Leaflet-Draw обычно возвращает массив [lat, lng] для простых полигонов.
       // Если это массив массивов (например, [[lat, lng], [lat, lng]]), берем первое кольцо.
       const outerRing = Array.isArray(selectedPolygonData.coordinates[0]) && Array.isArray(selectedPolygonData.coordinates[0][0])
-                           ? selectedPolygonData.coordinates[0]
-                           : selectedPolygonData.coordinates;
+                             ? selectedPolygonData.coordinates[0]
+                             : selectedPolygonData.coordinates;
 
       if (outerRing.length < 3) {
-        console.error('fetchAnalysisImage: Полигон содержит менее 3 точек, невозможно сформировать действительный полигон.');
+        console.error('fetchAnalysisImage: Полигон содержит менее 3 точек, невозможно сформировать действительный полигон. Координаты:', outerRing); // <--- ОБНОВЛЕНО: Добавлены координаты
         onError('Ошибка: Полигон содержит менее 3 точек.');
         onLoadingChange(false);
         return;
@@ -77,6 +78,8 @@ export default function PolygonAnalysisLayer({
         [bounds.getSouth(), bounds.getWest()],
         [bounds.getNorth(), bounds.getEast()]
       ];
+
+      console.log('fetchAnalysisImage: Рассчитанные границы изображения:', imageOverlayBounds);
 
       // Параметры для запроса к вашему бэкенд-эндпоинту
       const requestBody = {
@@ -159,7 +162,7 @@ export default function PolygonAnalysisLayer({
   console.log('PolygonAnalysisLayer render: analysisImageUrl:', analysisImageUrl, 'imageBounds:', imageBounds);
   return (
     analysisImageUrl && imageBounds ? (
-      <ImageOverlay url={analysisImageUrl} bounds={imageBounds} opacity={0.7} zIndex={500} />
+      <ImageOverlay url={analysisImageUrl} bounds={imageBounds} opacity={0.7} zIndex={9999} />
     ) : null
   );
 }

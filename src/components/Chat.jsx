@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom'; // Импортируем useNavigate для программной навигации
 import './Chat.css';
 
 // Максимальное количество сообщений в истории, отправляемых в OpenAI API
@@ -6,9 +7,10 @@ import './Chat.css';
 const MAX_MESSAGES_IN_HISTORY = 20; // Можно настроить это значение
 
 // Новый базовый URL для вашего развернутого бэкенда
-const BASE_API_URL = 'http://localhost:8080';
+const BASE_API_URL = 'https://back-production-b3f2.up.railway.app';
 
-export default function ChatPage() {
+// ChatPage теперь принимает prop handleLogout
+export default function ChatPage({ handleLogout }) { // Добавляем handleLogout в пропсы
   const [message, setMessage] = useState("");
   // chatHistories: объект, где ключи - ID полигонов, значения - массивы сообщений для этого полигона
   const [chatHistories, setChatHistories] = useState({});
@@ -21,6 +23,8 @@ export default function ChatPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
   const [userPolygons, setUserPolygons] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false); // Состояние для управления видимостью модального окна
+
+  const navigate = useNavigate(); // Инициализируем хук навигации
 
   // useRef для доступа к актуальным chatHistories без добавления в зависимости useCallback
   const chatHistoriesRef = useRef(chatHistories);
@@ -40,7 +44,8 @@ export default function ChatPage() {
 
   const handleMouseMove = (e) => {
     if (!isResizingRef.current || !sidebarRef.current) return;
-    const newWidth = Math.max(200, Math.min(e.clientX, 500));
+    // const newWidth = Math.max(200, Math.min(e.clientX, 500)); // <--- УДАЛЕНО: Ограничения ширины
+    const newWidth = e.clientX; // <--- ИЗМЕНЕНО: Ширина следует за курсором напрямую
     sidebarRef.current.style.width = `${newWidth}px`;
     localStorage.setItem('chatSidebarWidth', newWidth);
     document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
@@ -174,8 +179,15 @@ export default function ChatPage() {
         setCurrentMessages(prev => [...prev, { sender: 'ai', text: `Ошибка сервера: ${res.status} - ${errorData.error || 'Неизвестная ошибка'}` }]);
         
         if (res.status === 401 || res.status === 403) {
-          setIsLoggedIn(false);
-          localStorage.removeItem('token');
+          // Если токен недействителен, вызываем переданную функцию handleLogout
+          if (handleLogout) {
+            handleLogout();
+          } else {
+            // Запасной вариант, если handleLogout не передан
+            setIsLoggedIn(false);
+            localStorage.removeItem('token');
+            navigate('/login'); // Перенаправляем на страницу входа
+          }
         }
         // Откатываем оптимистичное обновление при ошибке
         setChatHistories(prev => ({
@@ -209,7 +221,7 @@ export default function ChatPage() {
       setIsTyping(false);
       setMessage('');
     }
-  }, [jwtToken, userPolygons]);
+  }, [jwtToken, userPolygons, handleLogout, navigate]); // Добавляем handleLogout и navigate в зависимости
 
   // Функция для загрузки истории чата для конкретного полигона
   // Теперь возвращает загруженные данные
@@ -232,8 +244,15 @@ export default function ChatPage() {
         console.error(`Ошибка HTTP при загрузке истории чата для полигона ${polygonId}: ${res.status} - ${errorText}`);
         setCurrentMessages(prev => [...prev, { sender: 'ai', text: `Не удалось загрузить историю чата для полигона. Ошибка: ${res.status}.` }]);
         if (res.status === 401 || res.status === 403) {
-          setIsLoggedIn(false);
-          localStorage.removeItem('token');
+          // Если токен недействителен, вызываем переданную функцию handleLogout
+          if (handleLogout) {
+            handleLogout();
+          } else {
+            // Запасной вариант, если handleLogout не передан
+            setIsLoggedIn(false);
+            localStorage.removeItem('token');
+            navigate('/login'); // Перенаправляем на страницу входа
+          }
         }
         return []; // Возвращаем пустой массив в случае ошибки
       }
@@ -251,7 +270,7 @@ export default function ChatPage() {
       setCurrentMessages(prev => [...prev, { sender: 'ai', text: `Не удалось загрузить историю чата для полигона. Ошибка сети или парсинга.` }]);
       return []; // Возвращаем пустой массив в случае ошибки
     }
-  }, [jwtToken]); // Удален currentMessages из зависимостей, так как он обновляется внутри
+  }, [jwtToken, handleLogout, navigate]); // Добавляем handleLogout и navigate в зависимости
 
   // Функция для обработки клика по полигону
   const handlePolygonClick = useCallback((polygon) => {
@@ -264,6 +283,16 @@ export default function ChatPage() {
   const fetchUserPolygons = useCallback(async (token) => {
     if (!token) {
       console.warn("Токен отсутствует, не могу загрузить полигоны.");
+      // Если токен отсутствует при попытке загрузки полигонов,
+      // это означает, что пользователь не авторизован.
+      // Вызываем handleLogout для перенаправления.
+      if (handleLogout) {
+        handleLogout();
+      } else {
+        setIsLoggedIn(false);
+        localStorage.removeItem('token');
+        navigate('/login');
+      }
       return;
     }
     try {
@@ -278,8 +307,15 @@ export default function ChatPage() {
         console.error(`Ошибка HTTP при загрузке полигонов: ${res.status}`);
         setCurrentMessages(prev => [...prev, { sender: 'ai', text: `Не удалось загрузить полигоны. Ошибка: ${res.status}.` }]);
         if (res.status === 401 || res.status === 403) {
-          setIsLoggedIn(false);
-          localStorage.removeItem('token');
+          // Если токен недействителен, вызываем переданную функцию handleLogout
+          if (handleLogout) {
+            handleLogout();
+          } else {
+            // Запасной вариант, если handleLogout не передан
+            setIsLoggedIn(false);
+            localStorage.removeItem('token');
+            navigate('/login'); // Перенаправляем на страницу входа
+          }
         }
         throw new Error(`HTTP error! status: ${res.status}`);
       }
@@ -312,7 +348,7 @@ export default function ChatPage() {
       console.error("Ошибка загрузки полигонов:", error);
       setCurrentMessages(prev => [...prev, { sender: 'ai', text: 'Не удалось загрузить полигоны. Ошибка сети или сервера.' }]);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, handleLogout, navigate]); // Добавляем handleLogout и navigate в зависимости
 
   // Эффект для инициализации токена и загрузки полигонов
   useEffect(() => {
@@ -326,8 +362,10 @@ export default function ChatPage() {
       setCurrentMessages(prev => [...prev, { sender: 'ai', text: 'Для использования чата необходима аутентификация. Пожалуйста, войдите на сайт.' }]);
       setIsLoggedIn(false);
       localStorage.removeItem('lastSelectedPolygonId'); // Очищаем, если пользователь не авторизован
+      // Если токена нет при загрузке страницы, сразу перенаправляем на логин
+      navigate('/login'); 
     }
-  }, [fetchUserPolygons]); 
+  }, [fetchUserPolygons, navigate]); // Добавляем navigate в зависимости
 
   // ЭФФЕКТ: для обработки выбранного полигона
   useEffect(() => {
@@ -379,8 +417,15 @@ export default function ChatPage() {
         console.error(`Ошибка HTTP при удалении истории чата: ${res.status} - ${errorText}`);
         setCurrentMessages(prev => [...prev, { sender: 'ai', text: `Не удалось очистить историю чата. Ошибка: ${res.status}.` }]);
         if (res.status === 401 || res.status === 403) {
-          setIsLoggedIn(false);
-          localStorage.removeItem('token');
+          // Если токен недействителен, вызываем переданную функцию handleLogout
+          if (handleLogout) {
+            handleLogout();
+          } else {
+            // Запасной вариант, если handleLogout не передан
+            setIsLoggedIn(false);
+            localStorage.removeItem('token');
+            navigate('/login'); // Перенаправляем на страницу входа
+          }
         }
         return;
       }
@@ -400,7 +445,7 @@ export default function ChatPage() {
     } finally {
         setIsTyping(false); // Скрываем индикатор печати
     }
-  }, [selectedPolygonId, jwtToken]);
+  }, [selectedPolygonId, jwtToken, handleLogout, navigate]);
 
   // НОВАЯ ФУНКЦИЯ: отмена очистки истории (скрывает модальное окно)
   const cancelClearHistory = useCallback(() => {
@@ -421,48 +466,48 @@ export default function ChatPage() {
   return (
     <div className="chat-container">
       <div className="chat-sidebar" ref={sidebarRef}>
-  <h3 className="sidebar-title">Мои Полигоны</h3>
+        <h3 className="sidebar-title">Мои Полигоны</h3>
 
-  <div className="polygon-buttons-container">
-    {userPolygons.length > 0 ? (
-      userPolygons.map((polygon) => (
-        <button
-          key={polygon.id}
-          className={`polygon-button ${selectedPolygonId === polygon.id ? 'selected' : ''}`} 
-          onClick={() => handlePolygonClick(polygon)} 
-          disabled={!isLoggedIn} 
-        >
-          {polygon.name} ({polygon.crop})
-        </button>
-      ))
-    ) : (
-      isLoggedIn ? (
-        <p className="no-polygons-message">У вас пока нет сохраненных полигонов.</p>
-      ) : (
-        <p className="no-polygons-message">Загрузка полигонов...</p>
-      )
-    )}
-  </div>
+        <div className="polygon-buttons-container">
+          {userPolygons.length > 0 ? (
+            userPolygons.map((polygon) => (
+              <button
+                key={polygon.id}
+                className={`polygon-button ${selectedPolygonId === polygon.id ? 'selected' : ''}`} 
+                onClick={() => handlePolygonClick(polygon)} 
+                disabled={!isLoggedIn} 
+              >
+                {polygon.name} ({polygon.crop})
+              </button>
+            ))
+          ) : (
+            isLoggedIn ? (
+              <p className="no-polygons-message">У вас пока нет сохраненных полигонов. Создайте их, чтобы начать диалог.</p>
+            ) : (
+              <p className="no-polygons-message">Загрузка полигонов...</p>
+            )
+          )}
+        </div>
 
-  {selectedPolygonId && isLoggedIn && (
-    <button 
-      className="clear-history-button" 
-      onClick={handleClearHistory}
-      disabled={isTyping}
-    >
-      Очистить историю
-    </button>
-  )}
+        {selectedPolygonId && isLoggedIn && (
+          <button 
+            className="clear-history-button" 
+            onClick={handleClearHistory}
+            disabled={isTyping}
+          >
+            Очистить историю
+          </button>
+        )}
 
-  {/* 👉 Добавляем полосу для изменения ширины */}
-  <div
-    className="resizer"
-    onMouseDown={() => {
-      isResizingRef.current = true;
-      document.body.style.cursor = 'ew-resize';
-    }}
-  ></div>
-</div>
+        {/* 👉 Добавляем полосу для изменения ширины */}
+        <div
+          className="resizer"
+          onMouseDown={() => {
+            isResizingRef.current = true;
+            document.body.style.cursor = 'ew-resize';
+          }}
+        ></div>
+      </div>
 
 
       <div className="chat-main">
