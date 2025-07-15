@@ -154,13 +154,29 @@
   font-weight: 300;
 }
 
+/* RegistrationModal.css */
+
 .input-group input:focus {
-  border-bottom-color: white;
-  box-shadow: 0 1px 0 0 white;
+  border-bottom-color: white; /* Делает нижнюю границу полностью белой при фокусе */
+  box-shadow: none; /* Удаляет тень, которая создает эффект полной рамки */
+  outline: none; /* Убирает стандартную обводку браузера, если она есть */
 }
 
 .input-group input:focus::placeholder {
   color: rgba(255, 255, 255, 0.5);
+}
+
+.input-group input {
+  width: 100%;
+  padding: 15px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5); /* This defines the default bottom border */
+  color: white;
+  font-size: 16px;
+  outline: none;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
 /* Кастомный чекбокс */

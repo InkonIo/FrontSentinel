@@ -6,10 +6,11 @@ import MapSidebar from './MapSidebar';
 import ToastNotification from './ToastNotification';
 import ConfirmDialog from './ConfirmDialog';
 import PolygonAnalysisLayer from './PolygonAnalysisLayer';
-import LayerSelectionBlock from './LayerSelectionBlock'; // <--- ИЗМЕНЕНО: Импортируем новый компонент
-
+import LayerSelectionBlock from './LayerSelectionBlock';
+import UserSelectionBlock from './UserSelectionBlock';
 import * as L from 'leaflet';
 import './Map.css';
+import { jwtDecode } from 'jwt-decode';
 
 const BASE_API_URL = 'http://localhost:8080';
 
@@ -52,7 +53,7 @@ export default function PolygonDrawMap({ handleLogout }) {
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [selectedPolygon, setSelectedPolygon] = useState(null);
   const [editingMapPolygon, setEditingMapPolygon] = useState(null);
-  const editableFGRef = useRef();
+  const editableFGRef = useRef(); // <--- Убедитесь, что эта строка присутствует и корректна
 
   const [toast, setToast] = useState({ message: '', type: '', visible: false });
   const [drawnPointsCount, setDrawnPointsCount] = useState(0);
@@ -61,13 +62,19 @@ export default function PolygonDrawMap({ handleLogout }) {
   const [isFetchingPolygons, setIsFetchingPolygons] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
-  // Состояния для аналитических слоев
-  const [activeAnalysisType, setActiveAnalysisType] = useState('none'); // По умолчанию 'none'
+  const [activeAnalysisType, setActiveAnalysisType] = useState('none');
   const [analysisDateRange, setAnalysisDateRange] = useState({ from: '', to: '' });
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
 
-  // Новое состояние для активного типа базовой карты
-  const [activeBaseMapType, setActiveBaseMapType] = useState('openstreetmap'); // По умолчанию OpenStreetMap
+  const [activeBaseMapType, setActiveBaseMapType] = useState('openstreetmap');
+
+  const [userRole, setUserRole] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
+  const [selectedUserForAdminView, setSelectedUserForAdminView] = useState(null);
+
+  // Новое состояние для хранения высоты LayerSelectionBlock
+  const [layerBlockHeight, setLayerBlockHeight] = useState(0);
+  const layerBlockInitialBottom = 35; // Это значение 'bottom' из LayerSelectionBlock
 
   const navigate = useNavigate();
 
@@ -81,16 +88,21 @@ export default function PolygonDrawMap({ handleLogout }) {
 
   const calculateArea = useCallback((coordinates) => {
     if (coordinates.length < 3) return 0;
+
     const R = 6378137;
     let area = 0;
+
     for (let i = 0, len = coordinates.length; i < len; i++) {
       const [lat1, lon1] = coordinates[i];
       const [lat2, lon2] = coordinates[(i + 1) % len];
+
       const phi1 = (lat1 * Math.PI) / 180;
       const phi2 = (lat2 * Math.PI) / 180;
       const dLambda = ((lon2 - lon1) * Math.PI) / 180;
+
       area += dLambda * (2 + Math.sin(phi1) + Math.sin(phi2));
     }
+
     area = (area * R * R) / 2.0;
     return Math.abs(area);
   }, []);
@@ -117,18 +129,14 @@ export default function PolygonDrawMap({ handleLogout }) {
     const token = localStorage.getItem('token');
     if (!token) {
       showToast('Ошибка: Токен аутентификации отсутствует. Пожалуйста, войдите в систему.', 'error');
-      console.error('Ошибка: Токен аутентификации отсутствует.');
-      if (handleLogout) {
-        handleLogout();
-      } else {
-        navigate('/login');
-      }
+      if (handleLogout) handleLogout();
+      else navigate('/login');
       return;
     }
     setIsSavingPolygon(true);
     try {
       const method = isUpdate ? 'PUT' : 'POST';
-      const url = isUpdate ? `${BASE_API_URL}/api/polygons/${id}` : `${BASE_API_URL}/api/polygons`;
+      const url = isUpdate ? `${BASE_API_URL}/api/polygons/${id}` : `${BASE_API_URL}/api/polygons/create`;
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -146,42 +154,30 @@ export default function PolygonDrawMap({ handleLogout }) {
       });
       const responseBody = await parseResponseBody(response);
       if (!response.ok) {
-        let errorMessage = response.statusText;
-        if (typeof responseBody === 'object' && responseBody !== null && responseBody.message) {
-          errorMessage = responseBody.message;
-        } else if (typeof responseBody === 'string' && responseBody.length > 0) {
-          errorMessage = responseBody;
-        }
-        showToast(`Ошибка ${isUpdate ? 'обновления' : 'сохранения'} полигона на сервере: ${errorMessage}`, 'error');
-        if (response.status === 401 || response.status === 403) {
-          if (handleLogout) {
-            handleLogout();
-          } else {
-            navigate('/login');
-          }
-        }
-        throw new Error(`Ошибка ${isUpdate ? 'обновления' : 'сохранения'} полигона на сервере: ${response.status} - ${errorMessage}`);
+        throw new Error(`Ошибка ${isUpdate ? 'обновления' : 'сохранения'} полигона на сервере: ${response.status}`);
       }
+      
       showToast(`Полигон "${name}" успешно ${isUpdate ? 'обновлен' : 'сохранен'} на сервере!`, 'success');
-      console.log(`Полигон успешно ${isUpdate ? 'обновлен' : 'сохранен'} на сервере:`, responseBody);
+
       if (!isUpdate) {
-        const actualPolygonId = (typeof responseBody === 'object' && responseBody !== null && responseBody.id)
-                                ? responseBody.id
-                                : (typeof responseBody === 'string' ? responseBody : id);
+        const actualPolygonId = (typeof responseBody === 'object' && responseBody?.id) ? responseBody.id : (typeof responseBody === 'string' ? responseBody : id);
         setPolygons(prev => prev.map(p => p.id === id ? { ...p, id: String(actualPolygonId) } : p));
       } else {
         setPolygons(prev => prev.map(p => p.id === id ? { ...polygonData } : p));
+        
+        setSelectedPolygon(null);
+        setIsEditingMode(false);
       }
+
     } catch (error) {
       showToast(`Не удалось ${isUpdate ? 'обновить' : 'сохранить'} полигон на сервере: ${error.message}`, 'error');
       console.error(`Ошибка при ${isUpdate ? 'обновлении' : 'сохранении'} полигона на сервере:`, error);
     } finally {
       setIsSavingPolygon(false);
     }
-  }, [showToast, handleLogout, navigate]);
+  }, [showToast, handleLogout, navigate, setSelectedPolygon, setIsEditingMode]);
 
   const startDrawing = () => {
-    console.log('startDrawing: Entering drawing mode');
     setIsDrawing(true);
     setSelectedPolygon(null);
     setIsEditingMode(false);
@@ -197,26 +193,21 @@ export default function PolygonDrawMap({ handleLogout }) {
   const handlePointAdded = useCallback(() => {
     setDrawnPointsCount(prevCount => {
       const newCount = prevCount + 1;
-      console.log(`PolygonDrawMap: handlePointAdded called. New count: ${newCount}`);
       return newCount;
     });
   }, []);
 
   useEffect(() => {
-    console.log(`PolygonDrawMap: useEffect for toasts. isDrawing: ${isDrawing}, drawnPointsCount: ${drawnPointsCount}`);
     if (isDrawing) {
       if (drawnPointsCount === 1) {
-        console.log('PolygonDrawMap: Showing toast for 1 point.');
         showToast('Отлично! Теперь добавьте еще точки. Для создания полигона необходимо минимум 3 точки.', 'info');
       } else if (drawnPointsCount >= 3) {
-        console.log('PolygonDrawMap: Showing toast for >= 3 points.');
         showToast('Вы нарисовали достаточно точек. Двойной клик на карте завершит рисование полигона.', 'info');
       }
     }
   }, [drawnPointsCount, isDrawing, showToast]);
 
   const stopDrawing = () => {
-    console.log('stopDrawing: Exiting drawing mode');
     if (window.clearCurrentPath) {
       window.clearCurrentPath();
     }
@@ -224,7 +215,6 @@ export default function PolygonDrawMap({ handleLogout }) {
   };
 
   const onPolygonComplete = useCallback((coordinates) => {
-    console.log('onPolygonComplete: New polygon completed', coordinates);
     const closedCoordinates = ensurePolygonClosed(coordinates);
     const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
     const newPolygon = {
@@ -244,7 +234,6 @@ export default function PolygonDrawMap({ handleLogout }) {
   }, [savePolygonToDatabase, showToast]);
 
   const updatePolygonColor = useCallback((polygonId, newColor) => {
-    console.log(`updatePolygonColor: Updating polygon ${polygonId} with color ${newColor}.`);
     setPolygons((prev) => {
       const updatedPolys = prev.map((p) =>
         p.id === polygonId ? { ...p, color: newColor } : p
@@ -257,7 +246,6 @@ export default function PolygonDrawMap({ handleLogout }) {
   }, [selectedPolygon]);
 
   const deletePolygon = useCallback(async (id) => {
-    console.log('deletePolygon: Attempting to delete polygon with ID', id);
     const token = localStorage.getItem('token');
     if (!token) {
       showToast('Ошибка: Токен аутентификации отсутствует. Пожалуйста, войдите в систему.', 'error');
@@ -277,7 +265,7 @@ export default function PolygonDrawMap({ handleLogout }) {
     }
     showToast('Полигон удален локально. Отправка запроса на сервер...', 'info');
     try {
-      const response = await fetch(`${BASE_API_URL}/api/polygons/${id}`, {
+      const response = await fetch(`${BASE_API_URL}/api/polygons/delete/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -300,7 +288,6 @@ export default function PolygonDrawMap({ handleLogout }) {
         throw new Error(`Ошибка удаления полигона с сервера: ${response.status} - ${errorMessage}`);
       }
       showToast('Полигон успешно удален с сервера!', 'success');
-      console.log(`Polygon with ID ${id} successfully deleted from DB.`);
     } catch (error) {
       showToast(`Не удалось удалить полигон с сервера: ${error.message}`, 'error');
       console.error('Ошибка при удалении полигона из БД:', error);
@@ -365,7 +352,6 @@ export default function PolygonDrawMap({ handleLogout }) {
             throw new Error(`Ошибка очистки всех полигонов с сервера: ${response.status} - ${errorMessage}`);
         }
         showToast('Все полигоны успешно удалены с сервера!', 'success');
-        console.log('All polygons successfully cleared from DB.');
     } catch (error) {
         showToast(`Не удалось очистить все полигоны с сервера: ${error.message}`, 'error');
         console.error('Ошибка при очистке всех полигонов из БД:', error);
@@ -383,7 +369,6 @@ export default function PolygonDrawMap({ handleLogout }) {
   }, [polygons.length, confirmClearAll, showToast]);
 
   const clearAllCrops = useCallback(() => {
-    console.log('clearAllCrops: Clearing all assigned crops.');
     setPolygons((prev) => prev.map((p) => ({ ...p, crop: null, comment: null, color: '#0000FF' })));
     if (selectedPolygon) {
       setSelectedPolygon(prev => ({ ...prev, crop: null, comment: null, color: '#0000FF' }));
@@ -392,7 +377,6 @@ export default function PolygonDrawMap({ handleLogout }) {
   }, [showToast, selectedPolygon]);
 
   const updatePolygonCrop = useCallback((polygonId, newCrop) => {
-    console.log(`updatePolygonCrop: Updating polygon ${polygonId} with crop ${newCrop}.`);
     setPolygons((prev) => {
       const updatedPolys = prev.map((p) => (p.id === polygonId ? { ...p, crop: newCrop } : p));
       if (selectedPolygon && selectedPolygon.id === polygonId) {
@@ -403,7 +387,6 @@ export default function PolygonDrawMap({ handleLogout }) {
   }, [selectedPolygon]);
 
   const updatePolygonName = useCallback((polygonId, newName) => {
-    console.log(`updatePolygonName: Updating polygon ${polygonId} with name ${newName}.`);
     setPolygons((prev) => {
       const updatedPolys = prev.map((p) =>
         p.id === polygonId ? { ...p, name: newName } : p
@@ -416,7 +399,6 @@ export default function PolygonDrawMap({ handleLogout }) {
   }, [selectedPolygon]);
 
   const updatePolygonComment = useCallback((polygonId, newComment) => {
-    console.log(`updatePolygonComment: Updating polygon ${polygonId} with comment ${newComment}.`);
     setPolygons((prev) => {
       const updatedPolys = prev.map((p) =>
         p.id === polygonId ? { ...p, comment: newComment } : p
@@ -429,10 +411,8 @@ export default function PolygonDrawMap({ handleLogout }) {
   }, [selectedPolygon]);
 
   const onSelectAnalysisForPolygon = useCallback((polygonData, analysisType) => {
-    console.log(`onSelectAnalysisForPolygon: Selected polygon ${polygonData.id} for analysis type ${analysisType}`);
-    
     if (selectedPolygon && selectedPolygon.id === polygonData.id && activeAnalysisType === analysisType) {
-      setActiveAnalysisType('none'); // Выключаем активный тип анализа
+      setActiveAnalysisType('none');
       showToast(`Слой "${analysisType}" для полигона выключен.`, 'info');
     } else {
       setSelectedPolygon(polygonData);
@@ -459,20 +439,19 @@ export default function PolygonDrawMap({ handleLogout }) {
 
 
   const handleEditPolygon = useCallback((polygonId) => {
-    console.log(`[handleEditPolygon] Attempting to edit polygon with ID: ${polygonId}`);
     setIsSavingPolygon(false);
     setIsFetchingPolygons(false);
     if (isDrawing) {
-      console.log('[handleEditPolygon] Exiting drawing mode.');
       setIsDrawing(false);
       if (window.clearCurrentPath) window.clearCurrentPath();
     }
-    if (editableFGRef.current) {
-        editableFGRef.current.clearLayers();
-    }
+    // НЕ ОЧИЩАЙТЕ editableFGRef.current здесь. Это делает MapComponent в своем useEffect.
+    // if (editableFGRef.current) {
+    //     editableFGRef.current.clearLayers();
+    // }
     const polygonToEdit = polygons.find((p) => p.id === polygonId);
     if (!polygonToEdit) {
-      console.error('[handleEditPolygon] Polygon for editing not found in state.');
+      console.error('Polygon for editing not found in state.');
       showToast('Полигон для редактирования не найден.', 'error');
       return;
     }
@@ -483,61 +462,109 @@ export default function PolygonDrawMap({ handleLogout }) {
       `📍 Режим редактирования активен. Перемещайте вершины полигона, чтобы изменить его форму. Нажмите "Остановить и сохранить" в боковой панели, чтобы применить изменения.`,
       'info'
     );
-    console.log('[handleEditPolygon] isEditingMode set to TRUE. isSavingPolygon and isFetchingPolygons set to FALSE.');
   }, [polygons, isDrawing, showToast]);
 
-  const handleStopAndSaveEdit = useCallback(() => {
-    console.log('handleStopAndSaveEdit: Attempting to stop and save.');
-    if (isDrawing) {
-      if (window.clearCurrentPath) window.clearCurrentPath();
-      stopDrawing();
-      showToast('Рисование остановлено.', 'info');
-    }
-    else if (isEditingMode && editableFGRef.current) {
-      editableFGRef.current.eachLayer(layer => {
-        if (layer.editing && layer.editing.enabled()) {
-          console.log('handleStopAndSaveEdit: Disabling editing for active layer.');
-          layer.editing.disable();
-          if (editingMapPolygon) {
-              const geoJson = layer.toGeoJSON();
-              const updatedCoords = geoJson.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
-              const currentPolygonInState = polygons.find(p => p.id === editingMapPolygon.id);
-              if (currentPolygonInState) {
-                  const updatedPoly = {
-                      ...currentPolygonInState,
-                      coordinates: updatedCoords,
-                  };
-                  setPolygons(prev => prev.map(p => p.id === updatedPoly.id ? updatedPoly : p));
-                  if (selectedPolygon && selectedPolygon.id === updatedPoly.id) {
-                    setSelectedPolygon(updatedPoly);
-                  }
-                  showToast('Форма полигона обновлена и сохранена локально! Отправка на сервер...', 'info');
-                  savePolygonToDatabase(updatedPoly, true);
+  const handleStopAndSaveEdit = useCallback(() => { 
+    if (isDrawing) { 
+      if (window.clearCurrentPath) window.clearCurrentPath(); 
+      stopDrawing(); 
+      showToast('Рисование остановлено.', 'info'); 
+    } 
+    else if (isEditingMode) { 
+      let updatedCoordinates = null;
+      let leafletLayerToDisableEditing = null;
+
+      if (editableFGRef.current) {
+          editableFGRef.current.eachLayer(layer => {
+              // Находим полигон, который был добавлен для редактирования
+              if (layer instanceof L.Polygon) {
+                  // Получаем координаты из Leaflet слоя
+                  updatedCoordinates = layer.toGeoJSON().geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
+                  leafletLayerToDisableEditing = layer; // Сохраняем ссылку на слой для отключения редактирования
               }
+          });
+      }
+      // Если координаты не были получены из Leaflet слоя (например, если не было изменений на карте),
+      // используем координаты из состояния editingMapPolygon.
+      if (!updatedCoordinates || updatedCoordinates.length === 0) {
+          console.log("handleStopAndSaveEdit: Не удалось получить обновленные координаты из Leaflet слоя. Использую editingMapPolygon.coordinates.");
+          updatedCoordinates = editingMapPolygon ? editingMapPolygon.coordinates : null;
+      }
+
+      if (!updatedCoordinates || updatedCoordinates.length === 0) {
+          console.error("handleStopAndSaveEdit: Критическая ошибка: Не удалось получить обновленные координаты для сохранения.");
+          showToast('Ошибка: Не удалось получить координаты полигона для сохранения.', 'error');
+          return; // Прекращаем выполнение, если нет координат
+      }
+
+      // Находим текущий полигон в состоянии polygons по ID editingMapPolygon
+      const currentPolygonInState = polygons.find(p => p.id === editingMapPolygon?.id);
+      
+      if (currentPolygonInState) { 
+          const updatedPoly = { 
+              ...currentPolygonInState, 
+              coordinates: updatedCoordinates, 
+          }; 
+          
+          setPolygons(prev => prev.map(p => p.id === updatedPoly.id ? updatedPoly : p)); 
+          if (selectedPolygon && selectedPolygon.id === updatedPoly.id) { 
+            setSelectedPolygon(updatedPoly); 
+          } 
+          
+          // Отключаем редактирование на Leaflet слое
+          if (leafletLayerToDisableEditing && leafletLayerToDisableEditing.editing && leafletLayerToDisableEditing.editing.enabled()) {
+              leafletLayerToDisableEditing.editing.disable();
+              console.log('handleStopAndSaveEdit: Редактирование Leaflet слоя отключено.');
           }
-        }
-      });
-      console.log('handleStopAndSaveEdit: Forcing state reset for editing mode.');
-      setIsEditingMode(false);
-      setEditingMapPolygon(null);
-      editableFGRef.current?.clearLayers();
-      showToast('Редактирование завершено и сохранено.', 'success');
-    } else {
-      showToast('Нет активных режимов для сохранения.', 'info');
-    }
+
+          showToast('Форма полигона обновлена и сохранена локально! Отправка на сервер...', 'info'); 
+          savePolygonToDatabase(updatedPoly, true); 
+      } else {
+          console.error("handleStopAndSaveEdit: Полигон для обновления не найден в состоянии polygons.");
+          showToast('Ошибка: Редактируемый полигон не найден.', 'error');
+      }
+      
+      console.log('handleStopAndSaveEdit: Принудительный сброс состояния режима редактирования.'); 
+      setIsEditingMode(false); 
+      setEditingMapPolygon(null); 
+      editableFGRef.current?.clearLayers(); // Очищаем FeatureGroup после сохранения
+      showToast('Редактирование завершено и сохранено.', 'success'); 
+    } else { 
+      showToast('Нет активных режимов для сохранения.', 'info'); 
+    } 
   }, [isDrawing, stopDrawing, isEditingMode, editingMapPolygon, polygons, savePolygonToDatabase, showToast, selectedPolygon]);
 
   const onPolygonEdited = useCallback(async (e) => {
-    console.log('onPolygonEdited: Event received from EditControl. Layers:', e.layers);
-    if (isEditingMode) {
-      setIsEditingMode(false);
-      setEditingMapPolygon(null);
-      showToast('Редактирование формы на карте завершено.', 'info');
-    }
-  }, [isEditingMode, editingMapPolygon, showToast]);
+    console.log("onPolygonEdited: Событие редактирования полигона на карте.");
+    let editedLayers = e.layers;
+    editedLayers.eachLayer((layer) => {
+        if (layer instanceof L.Polygon) {
+            const newCoordinates = layer.toGeoJSON().geometry.coordinates[0].map(coord => [coord[1], coord[0]]); // Leaflet to [lat, lng]
+            console.log("onPolygonEdited: Новые координаты после редактирования:", newCoordinates);
 
-  const showMyPolygons = useCallback(async () => {
-    showToast('Загрузка ваших полигонов с сервера...', 'info');
+            setPolygons(prevPolygons => {
+                return prevPolygons.map(p => {
+                    if (editingMapPolygon && p.id === editingMapPolygon.id) {
+                        return { ...p, coordinates: newCoordinates };
+                    }
+                    return p;
+                });
+            });
+            // Обновляем editingMapPolygon, чтобы он отражал последние координаты
+            setEditingMapPolygon(prev => prev ? { ...prev, coordinates: newCoordinates } : null);
+        }
+    });
+    // onPolygonEdited вызывается после завершения редактирования на карте.
+    // Если вы хотите, чтобы кнопка "Сохранить" была нажата пользователем,
+    // то здесь не нужно вызывать savePolygonToDatabase.
+    // setIsEditingMode(false); // Не сбрасываем режим редактирования здесь, пока пользователь не нажмет "Сохранить"
+    // setEditingMapPolygon(null); // Не сбрасываем здесь
+    showToast('Форма полигона изменена. Нажмите "Сохранить" для сохранения изменений.', 'info');
+  }, [editingMapPolygon, setPolygons, setEditingMapPolygon, showToast]);
+
+  const showMyPolygons = useCallback(async (userIdToFetch = null) => {
+    const fetchUrl = userIdToFetch ? `${BASE_API_URL}/api/polygons/user/${userIdToFetch}` : `${BASE_API_URL}/api/polygons/user`;
+    showToast(`Загрузка полигонов${userIdToFetch ? ` для пользователя ${userIdToFetch}` : ' текущего пользователя'} с сервера...`, 'info');
     const token = localStorage.getItem('token');
     if (!token) {
       showToast('Ошибка: Токен аутентификации отсутствует. Пожалуйста, войдите в систему.', 'error');
@@ -551,7 +578,7 @@ export default function PolygonDrawMap({ handleLogout }) {
     }
     setIsFetchingPolygons(true);
     try {
-        const response = await fetch(`${BASE_API_URL}/api/polygons/my`, {
+        const response = await fetch(fetchUrl, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -575,7 +602,6 @@ export default function PolygonDrawMap({ handleLogout }) {
             }
             throw new Error(`Ошибка загрузки полигонов с сервера: ${response.status} - ${errorMessage}`);
         }
-        console.log('Мои полигоны загружены с сервера:', data);
         if (data && Array.isArray(data)) {
           const loadedPolygons = data.map(item => {
             let coordinates = [];
@@ -623,6 +649,37 @@ export default function PolygonDrawMap({ handleLogout }) {
     }
   }, [showToast, handleLogout, navigate]);
 
+  const fetchAllUsers = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.warn("Токен отсутствует, не могу загрузить всех пользователей.");
+      return;
+    }
+    try {
+      const response = await fetch(`${BASE_API_URL}/api/v1/admin/users`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.status === 403) {
+        console.warn("Доступ запрещен для загрузки всех пользователей. Возможно, вы не админ.");
+        setAllUsers([]);
+        return;
+      }
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Ошибка при получении списка пользователей: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      setAllUsers(data);
+    } catch (error) {
+      console.error("Ошибка при загрузке всех пользователей:", error);
+      setAllUsers([]);
+    }
+  }, [BASE_API_URL]);
+
   useEffect(() => {
     let loadedFromLocalStorage = false;
     try {
@@ -641,49 +698,90 @@ export default function PolygonDrawMap({ handleLogout }) {
           console.warn('Invalid polygons data format in localStorage. Clearing and attempting to load from server.', parsedPolygons);
           localStorage.removeItem('savedPolygons');
         }
-      } else {
-        console.log('localStorage для полигонов пуст или отсутствует. Загружаю с сервера.');
       }
     } catch (error) {
       console.error("Критическая ошибка парсинга полигонов из localStorage. Очищаю и пытаюсь загрузить с сервера:", error);
       showToast('Критическая ошибка загрузки полигонов с локального устройства, пытаюсь загрузить с сервера.', 'error');
       localStorage.removeItem('savedPolygons');
     }
-    if (!loadedFromLocalStorage) {
-      const token = localStorage.getItem('token');
-      if (!token) {
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
         if (handleLogout) {
-          handleLogout();
+            handleLogout();
         } else {
-          navigate('/login');
+            navigate('/login');
         }
         return;
-      }
+    }
+
+    try {
+        const decodedToken = jwtDecode(token);
+        const roles = decodedToken.roles;
+        if (roles && Array.isArray(roles) && roles.includes('ROLE_ADMIN')) {
+            setUserRole('ADMIN');
+            fetchAllUsers();
+        } else {
+            setUserRole('USER');
+        }
+    } catch (error) {
+        console.error("Ошибка декодирования токена или определения роли:", error);
+        setUserRole('GUEST');
+        showToast('Ошибка определения роли пользователя. Пожалуйста, перезайдите.', 'error');
+        if (handleLogout) {
+            handleLogout();
+        } else {
+            navigate('/login');
+        }
+        return;
+    }
+
+    if (!loadedFromLocalStorage) {
       showMyPolygons();
     }
-  }, [showToast, showMyPolygons, handleLogout, navigate]);
+  }, [showToast, showMyPolygons, handleLogout, navigate, fetchAllUsers]);
+
+  const handleUserSelectForAdminView = useCallback((event) => {
+    const userId = event.target.value;
+    const user = allUsers.find(u => String(u.id) === userId); 
+    setSelectedUserForAdminView(user || null);
+
+    if (user) {
+        showToast(`Просмотр полигонов для пользователя: ${user.email}`, 'info');
+        showMyPolygons(user.id);
+    } else {
+        showToast('Просмотр полигонов текущего пользователя (админа).', 'info');
+        showMyPolygons(null);
+    }
+  }, [allUsers, showMyPolygons, showToast]);
+
 
   const finalSelectedPolygonData = selectedPolygon;
 
+  // Вычисляем позицию bottom для UserSelectionBlock
+  // Она должна быть на 40px выше верха LayerSelectionBlock.
+  // Верх LayerSelectionBlock находится на `window.innerHeight - (layerBlockInitialBottom + layerBlockHeight)`.
+  // Или проще, bottom UserSelectionBlock должен быть `layerBlockInitialBottom + layerBlockHeight + 40`.
+  const userBlockCalculatedBottom = `${layerBlockInitialBottom + layerBlockHeight + 30}px`;
+
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100%' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', position: 'relative' }}>
       <MapComponent
         polygons={polygons}
         onPolygonComplete={onPolygonComplete}
         onPolygonEdited={onPolygonEdited}
         isDrawing={isDrawing}
         setIsDrawing={setIsDrawing}
-        editableFGRef={editableFGRef}
+        editableFGRef={editableFGRef} // <--- Убедитесь, что editableFGRef передается здесь
         selectedPolygon={selectedPolygon}
         setSelectedPolygon={setSelectedPolygon}
         isEditingMode={isEditingMode}
         editingMapPolygon={editingMapPolygon}
-        // УДАЛЕНО: onSelectAnalysisForPolygon, activeAnalysisType, setActiveAnalysisType больше не передаются напрямую в MapComponent
         analysisDateRange={analysisDateRange}
         onLoadingChange={handleAnalysisLoadingChange}
         onError={handleAnalysisError}
-        onPointAdded={handlePointAdded}
-        activeBaseMapType={activeBaseMapType} // <--- НОВЫЙ ПРОП: Передаем активный тип базовой карты
+        onPointAdded={() => { /* Placeholder for future use */ }}
+        activeBaseMapType={activeBaseMapType}
       />
 
       <MapSidebar
@@ -712,6 +810,10 @@ export default function PolygonDrawMap({ handleLogout }) {
         showCropsSection={true}        
         savePolygonToDatabase={savePolygonToDatabase}
         BASE_API_URL={BASE_API_URL}
+        userRole={userRole}
+        allUsers={allUsers}
+        selectedUserForAdminView={selectedUserForAdminView}
+        handleUserSelectForAdminView={handleUserSelectForAdminView}
       />
 
       <ToastNotification
@@ -729,8 +831,7 @@ export default function PolygonDrawMap({ handleLogout }) {
         />
       )}
 
-      {/* Рендерим PolygonAnalysisLayer только если есть выбранный полигон и активный тип анализа */}
-      {finalSelectedPolygonData && activeAnalysisType && activeAnalysisType !== 'none' && ( // Добавляем проверку на 'none'
+      {finalSelectedPolygonData && activeAnalysisType && activeAnalysisType !== 'none' && (
         <PolygonAnalysisLayer
           selectedPolygonData={finalSelectedPolygonData}
           activeAnalysisType={activeAnalysisType}
@@ -750,13 +851,23 @@ export default function PolygonDrawMap({ handleLogout }) {
         </div>
       )}
 
-      {/* <--- ИЗМЕНЕНО: Используем новый LayerSelectionBlock вместо старого AnalysisSelectionBlock */}
+      {userRole === 'ADMIN' && (
+        <UserSelectionBlock
+          userRole={userRole}
+          allUsers={allUsers}
+          selectedUserForAdminView={selectedUserForAdminView}
+          handleUserSelectForAdminView={handleUserSelectForAdminView}
+          calculatedBottom={userBlockCalculatedBottom} // Передаем вычисленное значение bottom
+        />
+      )}
+
       <LayerSelectionBlock
         selectedPolygonData={finalSelectedPolygonData}
         activeBaseMapType={activeBaseMapType}
         onSelectBaseMap={setActiveBaseMapType}
         activeAnalysisType={activeAnalysisType}
         onSelectAnalysisForPolygon={onSelectAnalysisForPolygon}
+        setBlockHeight={setLayerBlockHeight} // Передаем функцию-сеттер
       />
     </div>
   );

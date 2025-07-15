@@ -23,8 +23,8 @@ export default function AnalysisSelectionBlock({
       borderRadius: '10px',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
       zIndex: 999, // Убедимся, что блок поверх карты
-      minWidth: '250px',
-      maxWidth: '300px',
+      minWidth: '200px',
+      maxWidth: '240px',
       display: 'flex',
       flexDirection: 'column',
       gap: '10px',

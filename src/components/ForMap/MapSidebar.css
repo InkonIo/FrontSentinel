@@ -672,26 +672,99 @@ body {
 /* Resizer Handle */
 .resizer {
   position: absolute;
-  left: 0;   /* ✨ Измените с 'right: 0;' на 'left: 0;' */
+  left: 0;   /* Расположение слева от сайдбара (который справа) */
   top: 0;
-  width: 8px; /* Ширина области для перетаскивания */
-  cursor: ew-resize; /* Курсор изменения размера восток-запад */
+  width: 8px; /* Область для захвата */
   height: 100%;
-  z-index: 100; /* Убедитесь, что он находится над другим содержимым */
-  background-color: rgba(255, 255, 255, 0.1);
-  transition: background-color 0.2s ease;
+  cursor: ew-resize; /* Курсор изменения размера */
+  z-index: 100;
+  /* --- УЛУЧШЕНИЕ --- */
+  /* Делаем ползунок видимым только при наведении для чистоты интерфейса */
+  background-color: transparent; /* По умолчанию прозрачный */
+  transition: background-color 0.3s ease;
+  /* Добавляем "ручку" для наглядности */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.resizer:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+.resizer:hover,
+.resizer:active {
+  /* При наведении или активации делаем его заметным */
+  background-color: rgba(255, 120, 30, 0.5); /* Оранжевый, как акцентный цвет */
 }
 
-/* Отключает выделение текста */
-.no-select {
-  -webkit-touch-callout: none; /* iOS Safari */
-  -webkit-user-select: none;   /* Safari */
-  -khtml-user-select: none;    /* Konqueror HTML */
-  -moz-user-select: none;      /* Old versions of Firefox */
-  -ms-user-select: none;       /* Internet Explorer/Edge */
-  user-select: none;           /* Standard syntax */
+/* Псевдо-элемент для создания "ручки" */
+.resizer::before {
+    content: '';
+    width: 2px;
+    height: 40px;
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.resizer:hover::before,
+.resizer:active::before {
+    background-color: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 5px rgba(255, 120, 30, 0.7);
+}
+
+
+/* --- НОВЫЕ СТИЛИ ДЛЯ АДМИН-СЕКЦИИ И ВЫПАДАЮЩЕГО СПИСКА --- */
+.map-sidebar-admin-section {
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed rgba(100, 100, 100, 0.4);
+}
+
+.map-sidebar-dropdown-select {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(100, 100, 100, 0.6);
+  background-color: rgba(50, 50, 50, 0.7);
+  color: #ecf0f1;
+  font-size: 13px;
+  box-sizing: border-box;
+  cursor: pointer;
+  appearance: none; /* Убираем стандартные стрелки */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%20viewBox%3D%220%200%20292.4%20292.4%22%3E%3Cpath%20fill%3D%22%23ecf0f1%22%20d%3D%22M287%20197.979L146.202%2057.181%205.404%20197.979h281.592z%22%2F%3E%3C%2Fsvg%3E'); /* Кастомная стрелка */
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.map-sidebar-dropdown-select:focus {
+  outline: none;
+  border-color: #fa7;
+  box-shadow: 0 0 0 2px rgba(255, 150, 0, 0.3);
+}
+
+.map-sidebar-dropdown-select option {
+  background-color: #1a1a1a; /* Фон для опций */
+  color: #ecf0f1;
+}
+
+.no-polygons-message {
+  color: #bbb;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 20px;
+  padding: 10px;
+  border: 1px dashed rgba(100, 100, 100, 0.4);
+  border-radius: 8px;
+  background-color: rgba(30, 30, 30, 0.6);
+}
+
+body.no-select {
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* Internet Explorer/Edge */
+  user-select: none;         /* Standard */
+  cursor: ew-resize !important; /* Убедитесь, что курсор остается неизменным */
 }

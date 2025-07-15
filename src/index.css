@@ -27,24 +27,20 @@ a:hover {
 
 body {
   margin: 0;
-  padding: 0; /* Убедитесь, что padding body равен 0 */
-  overflow-x: hidden; /* Предотвращает горизонтальную прокрутку */
-  /* place-items: center; */ /* Это может конфликтовать с flexbox или grid в корневых компонентах, рассмотрите удаление, если есть проблемы с компоновкой */
+  padding: 0;
+  overflow-x: hidden;
   min-width: 320px;
   min-height: 100vh;
-  /* ИЗМЕНЕНО: Устанавливаем фоновую картинку для body и делаем фон прозрачным,
-     чтобы картинка была видна сразу под хедером */
-  background-size: cover; /* Картинка будет покрывать всю область */
-  background-repeat: no-repeat; /* Не повторять картинку */
-  background-attachment: fixed; /* Картинка будет фиксированной при прокрутке */
-  background-color: transparent; /* Делаем фон body прозрачным */
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-color: transparent;
   color: #000000;
 }
 
 /* Тёмная тема */
 body.dark-theme {
-  /* ИЗМЕНЕНО: Устанавливаем темный фон для body в темной теме, если нет фоновой картинки */
-  background-color: #171717; /* Темнее, чтобы соответствовать хедеру */
+  background-color: #171717;
   background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
@@ -271,14 +267,37 @@ button {
 
 /* Стили для контейнера, который оборачивает все маршруты, кроме заголовка */
 .main-content-wrapper {
-  /* ИЗМЕНЕНО: Отступ сверху, чтобы содержимое не перекрывалось заголовком.
-     Ваш ProfileHeader имеет height: 30px и padding: 15px сверху и снизу.
-     Общая высота: 15 + 30 + 15 = 60px.
-     Поэтому padding-top должен быть не менее 60px. */
-  padding-top: 60px; /* Скорректировано */
-  /* ИЗМЕНЕНО: min-height должен учитывать полную высоту хедера */
-  min-height: calc(100vh - 60px); /* Вычитаем полную высоту хедера */
   box-sizing: border-box; /* Включает padding в общую высоту/ширину */
+  /* Минимальная высота, чтобы контент занимал оставшееся пространство */
+  min-height: calc(100vh - 60px); /* Значение по умолчанию для больших экранов */
+}
+
+/* Применяем padding-top только если пользователь аутентифицирован (класс 'authenticated' добавляется в App.jsx) */
+.main-content-wrapper.authenticated {
+  padding-top: 30px; /* Отступ для десктопов (30px высота заголовка + 15px сверху + 15px снизу = 60px) */
+}
+
+/* Медиа-запросы для адаптивного padding-top */
+@media (max-width: 1024px) {
+  .main-content-wrapper.authenticated {
+    padding-top: 60px; /* Сохраняем то же значение, если header не сильно меняется */
+  }
+}
+
+@media (max-width: 768px) {
+  /* На этом брейкпойнте ProfileHeader может быть 45px (включая внутренние padding) */
+  .main-content-wrapper.authenticated {
+    padding-top: 70px; /* Увеличиваем отступ, чтобы учесть 45px + запас */
+  }
+}
+
+@media (max-width: 640px) {
+  /* На этом брейкпойнте ProfileHeader становится flex-direction: column и height: auto,
+     его высота может сильно увеличиться (например, до 80-100px или более в зависимости от контента).
+     Подберите это значение экспериментально, чтобы оно было достаточным. */
+  .main-content-wrapper.authenticated {
+    padding-top: 100px; /* Ориентировочное значение, может потребовать точной настройки */
+  }
 }
 
 

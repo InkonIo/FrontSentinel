@@ -1,7 +1,7 @@
 // components/ForMap/MapSidebar.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import './MapSidebar.css';
+import './MapSidebar.css'; // ✨ Этот файл CSS уже используется для стилизации компонента
 
 export default function MapSidebar({
   polygons,
@@ -29,6 +29,12 @@ export default function MapSidebar({
   showCropsSection,
   savePolygonToDatabase,
   BASE_API_URL,
+  // --- УДАЛЕНЫ ПРОПСЫ, СВЯЗАННЫЕ С АДМИН-ПАНЕЛЬЮ И ПОЛЬЗОВАТЕЛЯМИ ---
+  // userRole, 
+  // allUsers, 
+  // selectedUserForAdminView, 
+  // handleUserSelectForAdminView, 
+  // --- КОНЕЦ УДАЛЕННЫХ ПРОПСОВ ---
 }) {
   const [activeSection, setActiveSection] = useState('map');
   const [showPolygonsList, setShowPolygonsList] = useState(true);
@@ -68,7 +74,6 @@ export default function MapSidebar({
       setLoadingCropData(false);
       return;
     }
-    console.log(`MapSidebar: Fetching data from URL: ${url}`);
     try {
       const response = await fetch(url, {
         headers: {
@@ -80,7 +85,6 @@ export default function MapSidebar({
         throw new Error(`Ошибка загрузки: ${response.status} - ${errorText}`);
       }
       const data = await response.json();
-      console.log(`MapSidebar: Successfully fetched data from ${url}:`, data);
 
       if (Array.isArray(data)) {
         if (url.includes('/chapters')) {
@@ -90,11 +94,9 @@ export default function MapSidebar({
         } else if (url.includes('/by-crop')) {
           setter(data.filter(item => item && typeof item.name === 'string').map(variety => variety.name));
         } else {
-          console.warn(`MapSidebar: Unexpected data format for URL ${url}. Setting as is.`, data);
           setter(data);
         }
       } else {
-        console.error(`MapSidebar: API response from ${url} is not an array:`, data);
         setCropDataError(`Некорректный формат данных от сервера для ${url}.`);
         setter([]);
       }
@@ -108,12 +110,10 @@ export default function MapSidebar({
   }, []);
 
   useEffect(() => {
-    console.log('MapSidebar: useEffect for chapters triggered.');
     fetchApiData(`${BASE_API_URL}/api/v1/crops/chapters`, setChapters, 'Не удалось загрузить главы культур');
   }, [fetchApiData, BASE_API_URL]);
 
   useEffect(() => {
-    console.log('MapSidebar: useEffect for cropsByChapter triggered. selectedChapter:', selectedChapter);
     if (selectedChapter) {
       fetchApiData(`${BASE_API_URL}/api/v1/crops/by-chapter?chapter=${encodeURIComponent(selectedChapter)}`, setCropsByChapter, 'Не удалось загрузить культуры для выбранной главы');
       setSelectedCrop('');
@@ -128,7 +128,6 @@ export default function MapSidebar({
   }, [selectedChapter, fetchApiData, BASE_API_URL]);
 
   useEffect(() => {
-    console.log('MapSidebar: useEffect for varietiesByCrop triggered. selectedCrop:', selectedCrop);
     if (selectedCrop) {
       fetchApiData(`${BASE_API_URL}/api/v1/crops/by-crop?crop=${encodeURIComponent(selectedCrop)}`, setVarietiesByCrop, 'Не удалось загрузить сорта для выбранной культуры');
       setSelectedVariety('');
@@ -141,38 +140,27 @@ export default function MapSidebar({
   const handleUpdatePolygonCrop = useCallback((polygonId, chapter, crop, variety) => {
     const parts = [];
     if (chapter) {
-      parts.push(chapter);
+        parts.push(chapter);
     }
     if (crop) {
-      parts.push(crop);
+        parts.push(crop);
     }
     if (variety) {
-      parts.push(variety);
+        parts.push(variety);
     }
     const fullCropName = parts.join(',');
-
-    console.log(`MapSidebar: handleUpdatePolygonCrop called for polygon ${polygonId}. New fullCropName: ${fullCropName}`);
-
     const currentPolygonInProps = polygons.find(p => p.id === polygonId);
 
     if (currentPolygonInProps && currentPolygonInProps.crop !== fullCropName) {
-      updatePolygonCrop(polygonId, fullCropName);
-      const polyToSave = { ...currentPolygonInProps, crop: fullCropName };
-      savePolygonToDatabase(polyToSave, true);
+        updatePolygonCrop(polygonId, fullCropName);
     }
-  }, [polygons, updatePolygonCrop, savePolygonToDatabase]);
+}, [polygons, updatePolygonCrop]); 
 
   useEffect(() => {
-    console.log('MapSidebar: useEffect for selectedPolygon change triggered. selectedPolygon:', selectedPolygon);
-    console.log('MapSidebar: Current chapters, cropsByChapter, varietiesByCrop:', chapters, cropsByChapter, varietiesByCrop);
-    console.log('MapSidebar: Loading crop data:', loadingCropData);
-
     if (selectedPolygon && selectedPolygon.id && !loadingCropData && chapters.length > 0) { 
       const polygon = polygons.find(p => p.id === selectedPolygon.id); 
       if (polygon && polygon.crop) {
         const parts = polygon.crop.split(',');
-        console.log('MapSidebar: Parsing existing crop for pre-selection:', polygon.crop, 'Parts:', parts);
-
         const chapterFromPolygon = parts[0] || '';
         const cropFromPolygon = parts[1] || '';
         const varietyFromPolygon = parts[2] || '';
@@ -196,13 +184,11 @@ export default function MapSidebar({
         }
 
       } else {
-        console.log('MapSidebar: No existing crop for selected polygon, resetting selections.');
         setSelectedChapter('');
         setSelectedCrop('');
         setSelectedVariety('');
       }
     } else if (!selectedPolygon) { 
-      console.log('MapSidebar: No polygon selected, resetting all crop selections.');
       setSelectedChapter('');
       setSelectedCrop('');
       setSelectedVariety('');
@@ -210,42 +196,89 @@ export default function MapSidebar({
   }, [selectedPolygon, polygons, chapters, cropsByChapter, varietiesByCrop, loadingCropData]); 
 
   // Resizer functions
-  const handleMouseDown = useCallback((e) => {
-    isResizing.current = true;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.body.classList.add('no-select'); // ✨ Добавьте это
-  }, []);
 
+  // 1. Объявляем handleMouseMove ПЕРВОЙ, так как она не зависит от других.
   const handleMouseMove = useCallback((e) => {
-    if (!isResizing.current) return;
-    if (sidebarRef.current) {
-      const sidebarRect = sidebarRef.current.getBoundingClientRect();
-      
-      // ✨ Новая логика для ползунка слева, когда сайдбар справа
-      // Ширина = (правый край экрана - текущая позиция курсора)
-      // или (правый край сайдбара - текущая позиция курсора на экране + смещение сайдбара от левого края экрана)
-      // Проще: ползунок слева, значит ширина = правая граница сайдбара - X курсора.
-      const newWidth = sidebarRect.right - e.clientX; 
+    if (!isResizing.current || !sidebarRef.current) return;
 
-      // Устанавливаем минимальную и максимальную ширину для сайдбара
-      const minWidth = 200; 
-      const maxWidth = 500; 
-      setSidebarWidth(Math.max(minWidth, Math.min(maxWidth, newWidth)));
-    }
-  }, []);
+    // Прямое изменение DOM для максимальной плавности
+    const newWidth = document.documentElement.clientWidth - e.clientX;
+    const minWidth = 200;
+    const maxWidth = 600; // Можно настроить максимальную ширину
 
+    const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+    
+    // Используем requestAnimationFrame для более плавной анимации
+    requestAnimationFrame(() => {
+        if (sidebarRef.current) {
+            sidebarRef.current.style.width = `${clampedWidth}px`;
+        }
+    });
+  }, []); // Зависимостей нет, так как ref не вызывает ре-рендер
+
+  // 2. Объявляем handleMouseUp ВТОРОЙ, она зависит от handleMouseMove
   const handleMouseUp = useCallback(() => {
+    if (isResizing.current && sidebarRef.current) {
+      // Обновляем состояние React только в самом конце
+      const finalWidth = parseInt(sidebarRef.current.style.width, 10);
+      setSidebarWidth(finalWidth);
+    }
+
     isResizing.current = false;
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
-  }, [handleMouseMove]);
+    document.body.classList.remove('no-select');
+    document.body.style.cursor = '';
+  }, [handleMouseMove, setSidebarWidth]); // Указываем зависимости
+
+  // 3. Объявляем handleMouseDown ПОСЛЕДНЕЙ
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault(); // Предотвращаем побочные эффекты, например, выделение
+    isResizing.current = true;
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    document.body.classList.add('no-select');
+    document.body.style.cursor = 'ew-resize';
+  }, [handleMouseMove, handleMouseUp]); // Указываем зависимости
+
+  // --- УДАЛЕНА КНОПКА АДМИНА ---
+  // const adminButton = userRole === 'ADMIN' ? ( 
+  //   <Link to="/admin-panel" className="sidebar-link"> 
+  //     <i className="fa-solid fa-user-gear"></i>
+  //     <span className="link-text">Админ</span>
+  //   </Link>
+  // ) : null;
+  // --- КОНЕЦ УДАЛЕННОЙ КНОПКИ ---
 
   return (
-    <div className={`map-sidebar-container`} ref={sidebarRef} style={{ width: sidebarWidth }}>
+    <div className={`map-sidebar-container`} ref={sidebarRef} style={{ width: `${sidebarWidth}px` }}>
       <div className="map-sidebar-content-wrapper">
-        <h2 className="map-sidebar-section-title" data-text="Управление картой">Управление картой</h2>
+        <h2 className="map-sidebar-section-title"style={{ marginTop: '-5px' }} data-text="Управление картой">Управление картой</h2>
         <hr className="map-sidebar-hr" />
+
+        {/* --- УДАЛЕН БЛОК: Выпадающий список пользователей для админа --- */}
+        {/* {userRole === 'ADMIN' && allUsers.length > 0 && (
+          <div className="map-sidebar-admin-section">
+            <h3 className="map-sidebar-section-title" data-text="Пользователи">Пользователи</h3>
+            <select
+              className="map-sidebar-dropdown-select"
+              onChange={handleUserSelectForAdminView}
+              value={selectedUserForAdminView ? selectedUserForAdminView.id : ''}
+              disabled={isFetchingPolygons}
+            >
+              <option value="">Выберите пользователя (Админ)</option>
+              {allUsers.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.email} (ID: {user.id})
+                </option>
+              ))}
+            </select>
+            <hr className="map-sidebar-hr" />
+          </div>
+        )} */}
+        {/* --- КОНЕЦ УДАЛЕННОГО БЛОКА --- */}
 
         <div className="map-sidebar-controls">
           <button
@@ -269,7 +302,11 @@ export default function MapSidebar({
           <button
             onClick={() => {
               if (!showPolygonsList) {
-                showMyPolygons();
+                // Если список скрыт и мы его показываем, то загружаем полигоны
+                // Если выбран пользователь для админ-просмотра, загружаем его полигоны
+                // Иначе загружаем полигоны текущего пользователя
+                // showMyPolygons(selectedUserForAdminView ? selectedUserForAdminView.id : null); // УДАЛЕНО: selectedUserForAdminView больше не пропс
+                showMyPolygons(); // Вызываем без аргументов, чтобы загрузить полигоны текущего пользователя
               }
               setShowPolygonsList(prev => !prev);
             }}
@@ -283,7 +320,7 @@ export default function MapSidebar({
 
         <hr className="map-sidebar-hr" />
 
-        {showPolygonsList && polygons.length > 0 && (
+        {showPolygonsList && polygons.length > 0 ? ( 
           <div className="polygon-list-section">
             <h3 className="polygon-list-header" data-text={`Полигоны (${polygons.length})`}>
               📐 Полигоны ({polygons.length})
@@ -399,7 +436,6 @@ export default function MapSidebar({
                           value={selectedChapter}
                           onChange={(e) => {
                             e.stopPropagation();
-                            console.log('MapSidebar: Chapter selected:', e.target.value);
                             setSelectedChapter(e.target.value);
                             setSelectedCrop('');
                             setSelectedVariety('');
@@ -430,7 +466,6 @@ export default function MapSidebar({
                             value={selectedCrop}
                             onChange={(e) => {
                               e.stopPropagation();
-                              console.log('MapSidebar: Crop selected:', e.target.value);
                               setSelectedCrop(e.target.value);
                               setSelectedVariety('');
                               handleUpdatePolygonCrop(polygon.id, selectedChapter, e.target.value, '');
@@ -537,6 +572,15 @@ export default function MapSidebar({
               ))}
             </div>
           </div>
+        ) : ( 
+          showPolygonsList && !isFetchingPolygons && (
+            <div className="polygon-list-section">
+              <h3 className="polygon-list-header">
+                📐 Полигоны (0)
+              </h3>
+              <p className="no-polygons-message">Полигоны не найдены.</p>
+            </div>
+          )
         )}
       </div>
 
@@ -600,7 +644,7 @@ export default function MapSidebar({
                       <div key={fullCrop} className="crop-tag">
                         {fullCrop}: {formatArea(area)}
                       </div>
-                    ))}
+                    ))}фф
                   </div>
                 </div>
               )}

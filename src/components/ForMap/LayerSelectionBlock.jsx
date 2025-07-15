@@ -1,5 +1,5 @@
 // components/ForMap/LayerSelectionBlock.jsx
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 
 // Опции для выбора базовой карты
 const baseMapOptions = [
@@ -22,48 +22,107 @@ const analysisOptions = [
   { value: 'HIGHLIGHT_OPTIMIZED_NATURAL_COLOR', label: 'Оптимизированный натуральный цвет' },
 ];
 
+// Общие стили для элементов <select>
+const commonSelectStyles = {
+  width: '100%',
+  padding: '6px 10px',
+  borderRadius: '6px',
+  border: '1px solid #555',
+  backgroundColor: '#333',
+  color: '#f0f0f0',
+  fontSize: '13px',
+  cursor: 'pointer',
+  appearance: 'none',
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 10px center',
+  backgroundSize: '14px',
+  // Увеличенный z-index для выпадающих списков, чтобы они не перекрывались
+  zIndex: 1000 // Убедитесь, что это выше z-index контейнера
+};
+
+// Общие стили для заголовков секций
+const sectionTitleStyles = {
+  margin: '0 0 8px',
+  fontSize: '16px',
+  color: '#4CAF50'
+};
+
+// Общие стили для абзацев описания
+const descriptionParagraphStyles = {
+  margin: '0 0 8px',
+  fontSize: '13px',
+  lineHeight: '1.4'
+};
+
+
 export default function LayerSelectionBlock({
-  selectedPolygonData,        // Данные выбранного полигона (для аналитических слоев)
-  activeBaseMapType,          // Текущий активный тип базовой карты
-  onSelectBaseMap,            // Функция для выбора базовой карты
-  activeAnalysisType,         // Текущий активный тип анализа
-  onSelectAnalysisForPolygon, // Функция для выбора аналитического слоя
+  selectedPolygonData,
+  activeBaseMapType,
+  onSelectBaseMap,
+  activeAnalysisType,
+  onSelectAnalysisForPolygon,
+  setBlockHeight, // Новая пропса для передачи высоты родительскому компоненту
 }) {
+  const blockRef = useRef(null);
+
+  useEffect(() => {
+    if (blockRef.current && setBlockHeight) {
+      // Используем ResizeObserver для более надежного отслеживания высоты,
+      // особенно если содержимое динамически изменяется (например, раскрывающиеся списки).
+      const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+          if (entry.target === blockRef.current) {
+            setBlockHeight(entry.contentRect.height);
+          }
+        }
+      });
+
+      resizeObserver.observe(blockRef.current);
+
+      // Начальное измерение
+      setBlockHeight(blockRef.current.offsetHeight);
+
+      return () => {
+        resizeObserver.disconnect();
+      };
+    }
+  }, [selectedPolygonData, activeBaseMapType, activeAnalysisType, setBlockHeight]); // Переизмеряем, если эти пропсы меняются, влияя на содержимое
+
   return (
-    <div style={{
-      position: 'absolute',
-      top: '650px', // Размещаем сверху, чтобы не конфликтовать с другими блоками снизу
+    <div
+      ref={blockRef} // Прикрепляем ref к основному div
+      style={{
+      position: 'absolute', // Оставляем 'absolute' для позиционирования блока на карте
+      bottom: '35px',
       left: '10px',
       backgroundColor: 'rgba(26, 26, 26, 0.9)',
       color: '#f0f0f0',
-      padding: '15px',
+      padding: '10px',
       borderRadius: '10px',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-      zIndex: 999,
-      minWidth: '280px', // Увеличиваем ширину для лучшего вида
-      maxWidth: '350px',
+      zIndex: 999, // Z-index для самого блока
+      minWidth: '220px',
+      maxWidth: '280px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '15px', // Увеличиваем зазор между секциями
+      gap: '10px',
       fontFamily: 'Inter, sans-serif',
-      border: '1px solid rgba(255, 255, 255, 0.1)'
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      // Добавлено для корректного отображения выпадающих списков
+      overflow: 'visible', // Позволяет содержимому выходить за границы (для выпадающих списков)
     }}>
       {/* Секция выбора базовой карты */}
       <div>
-        <h4 style={{ margin: '0 0 10px', fontSize: '18px', color: '#4CAF50' }}>Выбор Базовой Карты</h4>
-        <p style={{ margin: '0 0 10px', fontSize: '14px', lineHeight: '1.4' }}>
+        <h4 style={sectionTitleStyles}>Выбор Базовой Карты</h4>
+        <p style={descriptionParagraphStyles}>
           Выберите базовый слой для отображения.
         </p>
         <select
           onChange={(e) => onSelectBaseMap(e.target.value)}
           value={activeBaseMapType || 'openstreetmap'}
           style={{
-            width: '100%', padding: '8px 12px', borderRadius: '6px',
-            border: '1px solid #555', backgroundColor: '#333', color: '#f0f0f0',
-            fontSize: '14px', cursor: 'pointer', appearance: 'none',
+            ...commonSelectStyles,
             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f0f0f0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-            backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
-            backgroundSize: '16px'
           }}
         >
           {baseMapOptions.map(option => (
@@ -84,32 +143,29 @@ export default function LayerSelectionBlock({
 
       {/* Секция выбора аналитического слоя */}
       <div>
-        <h4 style={{ margin: '0 0 10px', fontSize: '18px', color: '#4CAF50' }}>Анализ Полигона</h4>
+        <h4 style={sectionTitleStyles}>Анализ Полигона</h4>
         {selectedPolygonData ? (
-          <p style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: 'bold' }}>
+          <p style={{ ...descriptionParagraphStyles, fontWeight: 'bold' }}>
             Выбран полигон: {selectedPolygonData.name || 'Без названия'}
           </p>
         ) : (
-          <p style={{ margin: '0 0 10px', fontSize: '14px', lineHeight: '1.4' }}>
+          <p style={descriptionParagraphStyles}>
             Выберите метку с полигоном на карте, чтобы начать анализ.
           </p>
         )}
         <select
           onChange={(e) => {
             const selectedType = e.target.value;
-            // Передаем весь объект полигона, чтобы функция onSelectAnalysisForPolygon могла работать
-            onSelectAnalysisForPolygon(selectedPolygonData, selectedType); 
+            onSelectAnalysisForPolygon(selectedPolygonData, selectedType);
           }}
-          value={activeAnalysisType || 'none'} // Устанавливаем текущий активный тип или 'none'
-          disabled={!selectedPolygonData} // Отключаем, если полигон не выбран
+          value={activeAnalysisType || 'none'}
+          disabled={!selectedPolygonData}
           style={{
-            width: '100%', padding: '8px 12px', borderRadius: '6px',
-            border: '1px solid #555', backgroundColor: selectedPolygonData ? '#333' : '#222',
-            color: selectedPolygonData ? '#f0f0f0' : '#888', fontSize: '14px',
-            cursor: selectedPolygonData ? 'pointer' : 'not-allowed', appearance: 'none',
+            ...commonSelectStyles,
+            backgroundColor: selectedPolygonData ? '#333' : '#222',
+            color: selectedPolygonData ? '#f0f0f0' : '#888',
+            cursor: selectedPolygonData ? 'pointer' : 'not-allowed',
             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${selectedPolygonData ? '%23f0f0f0' : '%23888'}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-            backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
-            backgroundSize: '16px'
           }}
         >
           {analysisOptions.map(option => (

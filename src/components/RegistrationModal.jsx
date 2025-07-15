@@ -22,11 +22,14 @@ export default function RegistrationModal({ onClose, onSuccess }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Эта логика теперь ТОЛЬКО для управления состоянием модального окна,
+    // а не для перенаправления. Перенаправление обрабатывается в App.jsx.
     const token = localStorage.getItem('token');
     const userRole = localStorage.getItem('role');
     if (token && userRole) {
       setIsRegistered(true);
-      onSuccess?.(userRole);
+      // onSuccess?.(userRole); // <<< УДАЛЕНА ЭТА СТРОКА!
+      // App.jsx теперь сам решает, куда перенаправить авторизованного пользователя.
     }
 
     const container = document.querySelector('.registration-modal');
@@ -36,10 +39,9 @@ export default function RegistrationModal({ onClose, onSuccess }) {
     for (let i = 0; i < 50; i++) {
       const particle = document.createElement('div');
       particle.className = 'particle';
-      particle.style.left = Math.random() * 100 + '%';
-      particle.style.top = Math.random() * 100 + '%';
-      particle.style.animationDelay = Math.random() * 20 + 's';
-      particle.style.animationDuration = (Math.random() * 10 + 10) + 's';
+      particle.style.left = `${Math.random() * 100}%`;
+      particle.style.animationDuration = `${Math.random() * 5 + 5}s`;
+      particle.style.animationDelay = `${Math.random() * 5}s`;
       container.appendChild(particle);
       particles.push(particle);
     }

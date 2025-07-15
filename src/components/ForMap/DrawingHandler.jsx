@@ -26,7 +26,6 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
   // Хук useMapEvents позволяет реагировать на события карты Leaflet
   useMapEvents({
     click: (e) => {
-      console.log('DrawingHandler: Click event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
       // Если режим рисования не активен, игнорируем клик
       if (!isDrawing) return;
 
@@ -35,7 +34,6 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
         const updatedPath = [...prev, newPoint];
         // Вызываем onPointAdded каждый раз, когда добавляется новая точка
         if (onPointAdded) {
-          console.log('DrawingHandler: Calling onPointAdded.');
           // Оборачиваем в setTimeout, чтобы отложить вызов и избежать StrictMode предупреждений
           setTimeout(() => onPointAdded(), 0); 
         }
@@ -43,7 +41,6 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
       });
     },
     dblclick: (e) => {
-      console.log('DrawingHandler: Double click event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
       // Если режим рисования не активен или точек меньше 3 (недостаточно для полигона), игнорируем двойной клик
       if (!isDrawing || currentPath.length < 3) return;
 
@@ -56,14 +53,12 @@ export default function DrawingHandler({ onPolygonComplete, onStopAndSave, isDra
       }, 0);
     },
     mousemove: (e) => {
-      console.log('DrawingHandler: Mousemove event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
       // Если режим рисования активен и есть хотя бы одна точка в пути, обновляем hoveredPoint
       if (isDrawing && currentPath.length > 0) {
         setHoveredPoint([e.latlng.lat, e.latlng.lng]);
       }
     },
     mouseout: () => {
-      console.log('DrawingHandler: Mouseout event. isDrawing:', isDrawing, 'currentPath length:', currentPath.length);
       // Когда курсор покидает карту, очищаем hoveredPoint
       setHoveredPoint(null); 
     }
